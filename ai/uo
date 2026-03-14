@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# uo — ClassicUO REST API wrapper for LLM clients
+# Usage: uo <command> [args...]
+# Requires: ClassicUO.RestAPI running locally (dotnet run --project src/ClassicUO.RestAPI)
+
+BASE="http://127.0.0.1:9000/api"
+J="Content-Type: application/json"
+
+_post() { curl -s -X POST "$BASE/$1" -H "$J" -d "$2"; }
+_get()  { curl -s "$BASE/$1"; }
+
+# JSON-encode a string. Uses jq if available, else basic escaping.
+_jstr() {
+    if command -v jq &>/dev/null; then
+        printf '%s' "$1" | jq -Rs .
+    else
+        printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    fi
+}
+
+cmd="${1:-summary}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+
+    # ── Observe ──────────────────────────────────────────────────────────
+
+    summary|s)
+        _get "summary"
+        ;;
+
+    player|p)
+        _get "player"
+        ;;
+
+    journal|j)
+        limit="${1:-}"
+        _get "journal${limit:+?limit=$limit}"
+        ;;
+
+    mobiles)
+        _get "world/mobiles"
+        ;;
+
+    paperdoll)
+        serial="${1:?Usage: uo paperdoll <serial>}"
+        _get "world/mobiles/$serial/paperdoll"
+        ;;
+
+    status)
+        _get "status"
+        ;;
+
+    # ── Move ─────────────────────────────────────────────────────────────
+
+    move|m)
+        dir="${1:?Usage: uo move <direction> [run]}"
+        run=false
+        [[ "${2:-}" == "run" || "${2:-}" == "true" ]] && run=true
+        _post "actions/move" "{\"direction\":\"$dir\",\"run\":$run}"
+        ;;
+
+    # walk <direction> <steps> [run]  — moves N steps with pacing
+    walk|w)
+        dir="${1:?Usage: uo walk <direction> <steps> [run]}"
+        steps="${2:-1}"
+        run=false
+        [[ "${3:-}" == "run" ]] && run=true
+        for ((i=0; i<steps; i++)); do
+            _post "actions/move" "{\"direction\":\"$dir\",\"run\":$run}"
+            [[ $i -lt $((steps-1)) ]] && sleep 0.4
+        done
+        ;;
+
+    # ── Speak ─────────────────────────────────────────────────────────────
+
+    say)
+        text="$(_jstr "${1:?Usage: uo say <text>}")"
+        _post "actions/say" "{\"text\":$text}"
+        ;;
+
+    yell)
+        text="$(_jstr "${1:?Usage: uo yell <text>}")"
+        _post "actions/say" "{\"text\":$text,\"type\":\"yell\"}"
+        ;;
+
+    whisper)
+        text="$(_jstr "${1:?Usage: uo whisper <text>}")"
+        _post "actions/say" "{\"text\":$text,\"type\":\"whisper\"}"
+        ;;
+
+    emote|e)
+        text="$(_jstr "${1:?Usage: uo emote <text>}")"
+        _post "actions/say" "{\"text\":$text,\"type\":\"emote\"}"
+        ;;
+
+    # ── Interact ──────────────────────────────────────────────────────────
+
+    use|u)
+        serial="${1:?Usage: uo use <serial>}"
+        _post "actions/use" "{\"serial\":$serial}"
+        ;;
+
+    attack)
+        serial="${1:?Usage: uo attack <serial>}"
+        _post "actions/attack" "{\"serial\":$serial}"
+        ;;
+
+    warmode)
+        mode=true
+        [[ "${1:-}" == "off" || "${1:-}" == "false" ]] && mode=false
+        _post "actions/warmode" "{\"enabled\":$mode}"
+        ;;
+
+    # ── Skills & Spells ───────────────────────────────────────────────────
+
+    skill)
+        idx="${1:?Usage: uo skill <index>}"
+        _post "actions/skill" "{\"index\":$idx}"
+        ;;
+
+    cast|spell)
+        idx="${1:?Usage: uo cast <spell_number>}"
+        _post "actions/spell" "{\"index\":$idx}"
+        ;;
+
+    # ── Shortcuts ─────────────────────────────────────────────────────────
+
+    meditate)   _post "actions/skill"  '{"index":46}' ;;  # Meditation
+    nightsight) _post "actions/spell"  '{"index":6}'  ;;  # Night Sight (no reagents)
+    heal)       _post "actions/spell"  '{"index":4}'  ;;  # Heal
+    magiclock)  _post "actions/spell"  '{"index":23}' ;;  # Magic Lock
+
+    # ── Help ──────────────────────────────────────────────────────────────
+
+    help|--help|-h)
+        cat <<'HELP'
+uo — ClassicUO REST API wrapper
+
+OBSERVE
+  uo summary [or: uo s]         Full world view: map, entities, journal
+  uo player  [or: uo p]         Detailed player stats and skills (JSON)
+  uo journal [limit]            Recent journal entries (JSON)
+  uo mobiles                    All visible mobiles (JSON)
+  uo paperdoll <serial>         Equipment layers for a nearby mobile (JSON)
+  uo status                     Connection state (JSON)
+
+MOVE
+  uo move <dir> [run]           One step. dir: north south east west ne se sw nw
+  uo walk <dir> <n> [run]       n steps with pacing (~0.4s between steps)
+
+SPEAK
+  uo say    <text>              Say something aloud
+  uo yell   <text>              Yell (wider broadcast range)
+  uo whisper <text>             Whisper (adjacent only)
+  uo emote  <text>              Emote (*Gemma looks around curiously*)
+
+INTERACT
+  uo use    <serial>            Double-click: open, talk-to, or activate
+  uo attack <serial>            Attack a mobile (enter war mode first)
+  uo warmode [on|off]           Toggle war/peace mode
+
+SKILLS & SPELLS
+  uo skill <index>              Use a skill by index number
+  uo cast  <spell#>             Cast a magery spell by number
+
+SHORTCUTS
+  uo meditate                   Meditation (skill 46) — regenerate mana
+  uo nightsight                 Cast Night Sight (spell 6, no reagents needed)
+  uo heal                       Cast Heal (spell 4)
+
+SKILL INDEX QUICK REF
+  0=Alchemy  16=Eval Int  17=Healing  23=Inscription
+  25=Magery  46=Meditation  47=Stealth  49=Necromancy
+
+SPELL INDEX QUICK REF (Magery)
+  Circle 1: 1=Clumsy  2=Create Food  3=Feeblemind  4=Heal  5=Magic Arrow
+            6=Night Sight  7=Reactive Armor  8=Weaken
+  Circle 2: 9=Agility  10=Cunning  11=Cure  12=Harm  13=Magic Trap
+            15=Protection  16=Strength
+  Circle 3: 17=Bless  22=Fireball  23=Magic Lock  24=Poison
+            26=Telekinesis  27=Teleport  28=Unlock  29=Wall of Stone
+HELP
+        ;;
+
+    *)
+        echo "Unknown command: $cmd. Try: uo help" >&2
+        exit 1
+        ;;
+esac
