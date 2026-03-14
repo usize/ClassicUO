@@ -75,6 +75,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClassicUO.Bootstrap", "src\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FileEmbed", "external\FileEmbed\FileEmbed\FileEmbed.csproj", "{027B5178-C306-4900-996D-97E8E43567B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassicUO.RestAPI", "src\ClassicUO.RestAPI\ClassicUO.RestAPI.csproj", "{E5B2F3E8-6C5B-420D-9592-457C5550606A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -171,6 +173,14 @@ Global
 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x64.ActiveCfg = Release|Any CPU
 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x64.Build.0 = Release|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Debug|x64.Build.0 = Debug|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Release|x64.ActiveCfg = Release|Any CPU
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -188,6 +198,7 @@ Global
 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
 		{8974A04C-8360-4225-ABDD-0C56555F676D} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
 		{027B5178-C306-4900-996D-97E8E43567B6} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
+		{E5B2F3E8-6C5B-420D-9592-457C5550606A} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0A99E91A-ADAB-45C3-8170-2656140F6EFA}
