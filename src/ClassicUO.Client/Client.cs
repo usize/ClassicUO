@@ -202,6 +202,7 @@ namespace ClassicUO
     internal static class Client
     {
         public static GameController Game { get; private set; }
+        internal static Func<IPluginHost, GameController> GameFactory;
 
 
         public static void Run(IPluginHost pluginHost)
@@ -210,7 +211,7 @@ namespace ClassicUO
 
             Log.Trace("Running game...");
 
-            using (Game = new GameController(pluginHost))
+            using (Game = GameFactory?.Invoke(pluginHost) ?? new GameController(pluginHost))
             {
                 // https://github.com/FNA-XNA/FNA/wiki/7:-FNA-Environment-Variables#fna_graphics_enable_highdpi
                 CUOEnviroment.IsHighDPI = Environment.GetEnvironmentVariable("FNA_GRAPHICS_ENABLE_HIGHDPI") == "1";
