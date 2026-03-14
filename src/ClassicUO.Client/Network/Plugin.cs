@@ -499,67 +499,64 @@ namespace ClassicUO.Network
         internal static void Tick()
         {
             Client.Game.PluginHost?.Tick();
+            if (Plugins.Count > 0) TickPlugins();
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void TickPlugins()
+        {
             foreach (Plugin t in Plugins)
             {
-                if (t._tick != null)
-                {
-                    t._tick();
-                }
+                if (t._tick != null) t._tick();
             }
         }
 
         internal static bool ProcessRecvPacket(byte[] data, ref int length)
         {
             bool result = Client.Game.PluginHost?.PacketIn(new ArraySegment<byte>(data, 0, length)) ?? true;
+            if (Plugins.Count > 0) ProcessRecvPacketPlugins(data, ref length, ref result);
+            return result;
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessRecvPacketPlugins(byte[] data, ref int length, ref bool result)
+        {
             foreach (Plugin plugin in Plugins)
             {
                 if (plugin._onRecv_new != null)
                 {
                     byte[] tmp = new byte[length];
                     Array.Copy(data, tmp, length);
-
-                    if (!plugin._onRecv_new(tmp, ref length))
-                    {
-                        result = false;
-                    }
-
+                    if (!plugin._onRecv_new(tmp, ref length)) result = false;
                     Array.Copy(tmp, data, length);
                 }
                 else if (plugin._onRecv != null)
                 {
                     byte[] tmp = new byte[length];
                     Array.Copy(data, tmp, length);
-
-                    if (!plugin._onRecv(ref tmp, ref length))
-                    {
-                        result = false;
-                    }
-
+                    if (!plugin._onRecv(ref tmp, ref length)) result = false;
                     Array.Copy(tmp, data, length);
                 }
             }
-
-            return result;
         }
 
         internal static bool ProcessSendPacket(ref Span<byte> message)
         {
             bool result = Client.Game.PluginHost?.PacketOut(message) ?? true;
+            if (Plugins.Count > 0) ProcessSendPacketPlugins(ref message, ref result);
+            return result;
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessSendPacketPlugins(ref Span<byte> message, ref bool result)
+        {
             foreach (Plugin plugin in Plugins)
             {
                 if (plugin._onSend_new != null)
                 {
                     var tmp = message.ToArray();
                     var length = tmp.Length;
-
-                    if (!plugin._onSend_new(tmp, ref length))
-                    {
-                        result = false;
-                    }
-
+                    if (!plugin._onSend_new(tmp, ref length)) result = false;
                     message = message.Slice(0, length);
                     tmp.AsSpan(0, length).CopyTo(message);
                 }
@@ -567,85 +564,75 @@ namespace ClassicUO.Network
                 {
                     var tmp = message.ToArray();
                     var length = tmp.Length;
-
-                    if (!plugin._onSend(ref tmp, ref length))
-                    {
-                        result = false;
-                    }
-
+                    if (!plugin._onSend(ref tmp, ref length)) result = false;
                     message = message.Slice(0, length);
                     tmp.AsSpan(0, length).CopyTo(message);
                 }
             }
-
-            return result;
         }
 
         internal static void OnClosing()
         {
             Client.Game.PluginHost?.Closing();
+            if (Plugins.Count > 0) OnClosingPlugins();
+            Plugins.Clear();
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void OnClosingPlugins()
+        {
             for (int i = 0; i < Plugins.Count; i++)
             {
-                if (Plugins[i]._onClientClose != null)
-                {
-                    Plugins[i]._onClientClose();
-                }
+                if (Plugins[i]._onClientClose != null) Plugins[i]._onClientClose();
             }
-
-            Plugins.Clear();
         }
 
         internal static void OnFocusGained()
         {
             Client.Game.PluginHost?.FocusGained();
+            if (Plugins.Count > 0) OnFocusGainedPlugins();
+        }
 
-            foreach (Plugin t in Plugins)
-            {
-                if (t._onFocusGained != null)
-                {
-                    t._onFocusGained();
-                }
-            }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void OnFocusGainedPlugins()
+        {
+            foreach (Plugin t in Plugins) { if (t._onFocusGained != null) t._onFocusGained(); }
         }
 
         internal static void OnFocusLost()
         {
             Client.Game.PluginHost?.FocusLost();
+            if (Plugins.Count > 0) OnFocusLostPlugins();
+        }
 
-            foreach (Plugin t in Plugins)
-            {
-                if (t._onFocusLost != null)
-                {
-                    t._onFocusLost();
-                }
-            }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void OnFocusLostPlugins()
+        {
+            foreach (Plugin t in Plugins) { if (t._onFocusLost != null) t._onFocusLost(); }
         }
 
         internal static void OnConnected()
         {
             Client.Game.PluginHost?.Connected();
+            if (Plugins.Count > 0) OnConnectedPlugins();
+        }
 
-            foreach (Plugin t in Plugins)
-            {
-                if (t._onConnected != null)
-                {
-                    t._onConnected();
-                }
-            }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void OnConnectedPlugins()
+        {
+            foreach (Plugin t in Plugins) { if (t._onConnected != null) t._onConnected(); }
         }
 
         internal static void OnDisconnected()
         {
             Client.Game.PluginHost?.Disconnected();
+            if (Plugins.Count > 0) OnDisconnectedPlugins();
+        }
 
-            foreach (Plugin t in Plugins)
-            {
-                if (t._onDisconnected != null)
-                {
-                    t._onDisconnected();
-                }
-            }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void OnDisconnectedPlugins()
+        {
+            foreach (Plugin t in Plugins) { if (t._onDisconnected != null) t._onDisconnected(); }
         }
 
         internal static bool ProcessHotkeys(int key, int mod, bool ispressed)
@@ -661,31 +648,31 @@ namespace ClassicUO.Network
                 return true;
             }
 
-            var ok = Client.Game.PluginHost?.Hotkey(key, mod, ispressed);
+            bool result = Client.Game.PluginHost?.Hotkey(key, mod, ispressed) ?? true;
+            if (Plugins.Count > 0) ProcessHotkeysPlugins(key, mod, ispressed, ref result);
+            return result;
+        }
 
-            bool result = ok ?? true;
-
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessHotkeysPlugins(int key, int mod, bool ispressed, ref bool result)
+        {
             foreach (Plugin plugin in Plugins)
             {
-                if (
-                    plugin._onHotkeyPressed != null && !plugin._onHotkeyPressed(key, mod, ispressed)
-                )
-                {
+                if (plugin._onHotkeyPressed != null && !plugin._onHotkeyPressed(key, mod, ispressed))
                     result = false;
-                }
             }
-
-            return result;
         }
 
         internal static void ProcessMouse(int button, int wheel)
         {
             Client.Game.PluginHost?.Mouse(button, wheel);
+            if (Plugins.Count > 0) ProcessMousePlugins(button, wheel);
+        }
 
-            foreach (Plugin plugin in Plugins)
-            {
-                plugin._onMouse?.Invoke(button, wheel);
-            }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessMousePlugins(int button, int wheel)
+        {
+            foreach (Plugin plugin in Plugins) plugin._onMouse?.Invoke(button, wheel);
         }
 
         internal static void ProcessDrawCmdList(GraphicsDevice device)
@@ -694,55 +681,57 @@ namespace ClassicUO.Network
             var len = 0;
             Client.Game.PluginHost?.GetCommandList(out cmdList, out len);
             if (Client.Game.PluginHost != null && len != 0 && cmdList != IntPtr.Zero)
-            {
                 HandleCmdList(device, cmdList, len, Client.Game.PluginHost.GfxResources);
-            }
+            if (Plugins.Count > 0) ProcessDrawCmdListPlugins(device);
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessDrawCmdListPlugins(GraphicsDevice device)
+        {
             foreach (Plugin plugin in Plugins)
             {
                 if (plugin._draw_cmd_list != null)
                 {
-                    len = 0;
+                    IntPtr cmdList = IntPtr.Zero;
+                    var len = 0;
                     plugin._draw_cmd_list.Invoke(out cmdList, ref len);
-
                     if (len != 0 && cmdList != IntPtr.Zero)
-                    {
                         HandleCmdList(device, cmdList, len, plugin._resources);
-                    }
                 }
             }
         }
 
         internal static int ProcessWndProc(SDL.SDL_Event* e)
         {
-            var result = Client.Game.PluginHost?.SdlEvent(e) ?? 0;
+            int result = Client.Game.PluginHost?.SdlEvent(e) ?? 0;
+            if (Plugins.Count > 0) ProcessWndProcPlugins(e, ref result);
+            return result;
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ProcessWndProcPlugins(SDL.SDL_Event* e, ref int result)
+        {
             foreach (Plugin plugin in Plugins)
             {
-                if (plugin._on_wnd_proc != null)
-                {
-                    result |= plugin._on_wnd_proc(e);
-                }
+                if (plugin._on_wnd_proc != null) result |= plugin._on_wnd_proc(e);
             }
-
-            return result;
         }
 
         internal static void UpdatePlayerPosition(int x, int y, int z)
         {
             Client.Game.PluginHost?.UpdatePlayerPosition(x, y, z);
+            if (Plugins.Count > 0) UpdatePlayerPositionPlugins(x, y, z);
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void UpdatePlayerPositionPlugins(int x, int y, int z)
+        {
             foreach (Plugin plugin in Plugins)
             {
                 try
                 {
-                    // TODO: need fixed on razor side
-                    // if you quick entry (0.5-1 sec after start, without razor window loaded) - breaks CUO.
-                    // With this fix - the razor does not work, but client does not crashed.
                     if (plugin._onUpdatePlayerPosition != null)
-                    {
                         plugin._onUpdatePlayerPosition(x, y, z);
-                    }
                 }
                 catch
                 {

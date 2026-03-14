@@ -160,7 +160,7 @@ namespace ClassicUO
 
             Audio?.StopMusic();
             Settings.GlobalSettings.Save();
-            Plugin.OnClosing();
+            try { Plugin.OnClosing(); } catch { /* cuoapi.dll is optional; swallow if not present */ }
 
             UO.Unload();
 
@@ -396,7 +396,7 @@ namespace ClassicUO
             NetClient.Socket.Statistics.TotalPacketsReceived += (uint)packetsCount;
             NetClient.Socket.Flush();
 
-            Plugin.Tick();
+            try { Plugin.Tick(); } catch { /* cuoapi.dll is optional; swallow if not present */ }
 
             if (Scene != null && Scene.IsLoaded && !Scene.IsDestroyed)
             {
@@ -624,24 +624,20 @@ namespace ClassicUO
                     break;
 
                 case SDL_EventType.SDL_EVENT_WINDOW_FOCUS_GAINED:
-                    Plugin.OnFocusGained();
+                    try { Plugin.OnFocusGained(); } catch { }
                     break;
 
                 case SDL_EventType.SDL_EVENT_WINDOW_FOCUS_LOST:
-                    Plugin.OnFocusLost();
+                    try { Plugin.OnFocusLost(); } catch { }
                     break;
 
                 case SDL_EventType.SDL_EVENT_KEY_DOWN:
 
                     Keyboard.OnKeyDown(sdlEvent->key);
 
-                    if (
-                        Plugin.ProcessHotkeys(
-                            (int)sdlEvent->key.key,
-                            (int)sdlEvent->key.mod,
-                            true
-                        )
-                    )
+                    bool hotkeyDown = true;
+                    try { hotkeyDown = Plugin.ProcessHotkeys((int)sdlEvent->key.key, (int)sdlEvent->key.mod, true); } catch { }
+                    if (hotkeyDown)
                     {
                         _ignoreNextTextInput = false;
 
@@ -667,7 +663,7 @@ namespace ClassicUO
                         sdlEvent->key.mod
                     );
                     Scene.OnKeyUp(sdlEvent->key);
-                    Plugin.ProcessHotkeys(0, 0, false);
+                    try { Plugin.ProcessHotkeys(0, 0, false); } catch { }
 
                     if ((SDL_Keycode)sdlEvent->key.key == SDL_Keycode.SDLK_PRINTSCREEN)
                     {
@@ -737,7 +733,7 @@ namespace ClassicUO
                     Mouse.Update();
                     bool isScrolledUp = sdlEvent->wheel.y > 0;
 
-                    Plugin.ProcessMouse(0, (int)sdlEvent->wheel.y);
+                    try { Plugin.ProcessMouse(0, (int)sdlEvent->wheel.y); } catch { }
 
                     if (!Scene.OnMouseWheel(isScrolledUp))
                     {
@@ -814,7 +810,7 @@ namespace ClassicUO
                             && buttonType != MouseButtonType.Right
                         )
                         {
-                            Plugin.ProcessMouse(sdlEvent->button.button, 0);
+                            try { Plugin.ProcessMouse(sdlEvent->button.button, 0); } catch { }
                         }
 
                         if (!Scene.OnMouseDown(buttonType))

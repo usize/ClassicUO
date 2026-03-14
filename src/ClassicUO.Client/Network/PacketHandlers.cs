@@ -111,7 +111,9 @@ namespace ClassicUO.Network
                     // TODO: the pluging function should allow Span<byte> or unsafe type only.
                     // The current one is a bad style decision.
                     // It will be fixed once the new plugin system is done.
-                    if (!allowPlugins || Plugin.ProcessRecvPacket(packetBuffer, ref packetlength))
+                    bool recvAllowed = true;
+                    try { recvAllowed = !allowPlugins || Plugin.ProcessRecvPacket(packetBuffer, ref packetlength); } catch { }
+                    if (recvAllowed)
                     {
                         AnalyzePacket(world, packetBuffer.AsSpan(0, packetlength), offset);
 

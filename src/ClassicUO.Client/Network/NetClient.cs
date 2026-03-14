@@ -224,7 +224,9 @@ namespace ClassicUO.Network
                 return;
             }
 
-            if (!ignorePlugin && !Plugin.ProcessSendPacket(ref message))
+            bool sendAllowed = true;
+            try { sendAllowed = ignorePlugin || Plugin.ProcessSendPacket(ref message); } catch { }
+            if (!sendAllowed)
             {
                 return;
             }
