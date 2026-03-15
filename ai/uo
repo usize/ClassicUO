@@ -152,6 +152,37 @@ case "$cmd" in
         _post "actions/opendoor" '{}'
         ;;
 
+    # ── Containers & Inventory ─────────────────────────────────────────────
+
+    # backpack — view contents of your backpack
+    backpack|bp)
+        _get "containers/backpack"
+        ;;
+
+    # container <serial> — view contents of a container
+    container)
+        serial="${1:?Usage: uo container <serial>}"
+        _get "containers/$serial"
+        ;;
+
+    # grab <serial> [amount] — pick up item and put in backpack
+    grab|g)
+        serial="${1:?Usage: uo grab <serial> [amount]}"
+        amount="${2:-0}"
+        _post "actions/grab" "{\"serial\":$serial,\"amount\":$amount}"
+        ;;
+
+    # drop <serial> [container_serial] — drop held item into container or ground
+    drop)
+        serial="${1:?Usage: uo drop <serial> [container_serial]}"
+        container="${2:-}"
+        if [[ -n "$container" ]]; then
+            _post "actions/drop" "{\"serial\":$serial,\"container\":$container}"
+        else
+            _post "actions/drop" "{\"serial\":$serial}"
+        fi
+        ;;
+
     # ── Gumps (NPC dialogs, menus) ───────────────────────────────────────
 
     # gumps  — list all open server gumps
@@ -247,6 +278,12 @@ INTERACT
   uo target cancel              Cancel targeting cursor
   uo attack <serial>            Attack a mobile (enter war mode first)
   uo warmode [on|off]           Toggle war/peace mode
+
+CONTAINERS & INVENTORY
+  uo backpack                   View your backpack contents (JSON)
+  uo container <serial>         View contents of any container (JSON)
+  uo grab <serial> [amount]     Pick up item and put in backpack
+  uo drop <serial> [container]  Drop item into container or on ground
 
 GUMPS (NPC dialogs, menus)
   uo gumps                      List all open server gumps (JSON)

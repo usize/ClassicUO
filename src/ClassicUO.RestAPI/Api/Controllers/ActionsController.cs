@@ -247,6 +247,40 @@ namespace ClassicUO.RestApi.Controllers
             return BadRequest("provide 'serial', 'x'+'y'+'z' for ground target, or 'cancel':true");
         }
 
+        /// <summary>Pick up an item and move it directly to the player's backpack.</summary>
+        [HttpPost("grab")]
+        public IActionResult Grab([FromBody] GrabRequest request)
+        {
+            var serial = request.Serial;
+            var amount = request.Amount;
+            Enqueue(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return;
+
+                ushort qty = amount > 0 ? amount : ushort.MaxValue;
+                GameActions.GrabItem(world, serial, qty);
+            });
+
+            return Accepted();
+        }
+
+        /// <summary>Drop a currently held item into a container or on the ground.</summary>
+        [HttpPost("drop")]
+        public IActionResult Drop([FromBody] DropRequest request)
+        {
+            Enqueue(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return;
+
+                var container = request.Container ?? 0xFFFF_FFFF;
+                GameActions.DropItem(request.Serial, request.X, request.Y, request.Z, container);
+            });
+
+            return Accepted();
+        }
+
         private static World GetWorld()
         {
             return Client.Game?.UO?.World;

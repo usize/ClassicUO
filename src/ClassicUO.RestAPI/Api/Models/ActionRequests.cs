@@ -52,6 +52,28 @@ namespace ClassicUO.RestApi.Models
         public bool Cancel { get; set; }
     }
 
+    public class GrabRequest
+    {
+        /// <summary>Serial of the item to pick up and move to backpack.</summary>
+        public uint Serial { get; set; }
+        /// <summary>Quantity to grab. Defaults to all.</summary>
+        public ushort Amount { get; set; } = 0;
+    }
+
+    public class DropRequest
+    {
+        /// <summary>Serial of the currently held item to drop.</summary>
+        public uint Serial { get; set; }
+        /// <summary>Container serial to drop into. If omitted, drops on ground.</summary>
+        public uint? Container { get; set; }
+        /// <summary>X position within container or ground.</summary>
+        public ushort X { get; set; } = 0xFFFF;
+        /// <summary>Y position within container or ground.</summary>
+        public ushort Y { get; set; } = 0xFFFF;
+        /// <summary>Z position (ground only).</summary>
+        public sbyte Z { get; set; } = 0;
+    }
+
     public class PathfindRequest
     {
         /// <summary>Target X coordinate. Provide X+Y, or Serial, but not both.</summary>
