@@ -1,3 +1,27 @@
+## ClassicUO Claude Skill Sandbox
+
+### What
+
+A version of Classic UO client running with a REST API that allows:
+    - Text based rendering of the map
+    - Interaction with the environment / control of an avatar
+
+As well as a skill for both Claude and Vibe coding harnesses.
+
+### Why
+
+To experiment with building AI Agents that can play Ultima Online
+
+### How
+
+See (ai/README.md)[ai/README.md]
+
+<p align="center">
+    <img src="UO-claude-skill.gif" >
+</p>
+
+---- 
+
 <p align="center">
     <img src="https://i.imgur.com/CgpwyIQ.png" width="190" height="200" >
 </p>

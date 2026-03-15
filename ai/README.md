@@ -39,13 +39,13 @@ character = "My Character"
 ## Run
 
 ```bash
-./run.sh
+./run_rest_client.sh
 ```
 
 CLI flags override the config file for any field:
 
 ```bash
-./run.sh --username foo --password bar --char "Alt Char"
+./run_rest_client.sh --username foo --password bar --char "Alt Char"
 ```
 
 The REST API starts at `http://127.0.0.1:9000` once the character is in the world.
