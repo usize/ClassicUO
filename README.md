@@ -14,11 +14,9 @@ To experiment with building AI Agents that can play Ultima Online
 
 ### How
 
-See (ai/README.md)[ai/README.md]
+See [ai/README.md](./ai/README.md)
 
-<p align="center">
-    <img src="UO-claude-skill.gif" >
-</p>
+![skill gameplay](./UO-Claude-Skill.gif)
 
 ---- 
 
