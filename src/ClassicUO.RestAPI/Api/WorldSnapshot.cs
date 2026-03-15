@@ -47,6 +47,25 @@ namespace ClassicUO.RestApi
                 }
             }
 
+            // Overlay dynamic ground items (furniture, chests, etc.) that block movement
+            // but are invisible to the static tile pass above.
+            if (world.Items != null)
+            {
+                foreach (var item in world.Items.Values)
+                {
+                    if (item == null || !item.OnGround) continue;
+                    int gx = item.X - g.PlayerX + RadiusX;
+                    int gy = item.Y - g.PlayerY + RadiusY;
+                    if (gx < 0 || gx >= Width || gy < 0 || gy >= Height) continue;
+
+                    var data = item.ItemData;
+                    if (data.IsDoor)
+                        g.Cells[gx, gy] = '+';
+                    else if ((data.IsImpassable || data.IsWall) && g.Cells[gx, gy] != '+')
+                        g.Cells[gx, gy] = '#';
+                }
+            }
+
             return g;
         }
 
