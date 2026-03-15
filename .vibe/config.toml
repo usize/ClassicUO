@@ -15,9 +15,9 @@ active_model = "devstral-2"
 # players or take destructive actions unless you ask it to.
 active_agent = "auto-approve"
 
-# Load the Gemma skill (discovered from .agents/skills/gemma/SKILL.md).
-# Invoke in vibe chat with: /gemma
-enabled_skills = ["gemma"]
+# Load the UO skill (discovered from .agents/skills/uo/SKILL.md).
+# Invoke in vibe chat with: /uo
+enabled_skills = ["uo"]
 
 # Allow bash unconditionally so ./ai/uo calls go through without asking.
 [tools.bash]
