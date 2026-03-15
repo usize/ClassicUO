@@ -313,6 +313,18 @@ namespace ClassicUO.Game.UI.Gumps
 
         public bool IsBuyGump { get; }
 
+        /// <summary>Returns a snapshot of all shop items (serial, graphic, hue, amount, price, name).</summary>
+        internal IReadOnlyList<(uint Serial, ushort Graphic, ushort Hue, int Amount, uint Price, string Name)> GetShopItemSnapshot()
+        {
+            var list = new List<(uint, ushort, ushort, int, uint, string)>(_shopItems.Count);
+            foreach (var kvp in _shopItems)
+            {
+                var si = kvp.Value;
+                list.Add((si.LocalSerial, si.Graphic, si.Hue, si.Amount, si.Price, si.Name ?? string.Empty));
+            }
+            return list;
+        }
+
         //public void SetIfNameIsFromCliloc(Item it, bool fromcliloc)
         //{
         //    if (_shopItems.TryGetValue(it, out var shopItem))

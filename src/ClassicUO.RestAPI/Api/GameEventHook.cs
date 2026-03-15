@@ -6,6 +6,7 @@ using ClassicUO.Game;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
+using ClassicUO.Game.UI.Gumps;
 using ClassicUO.RestApi;
 using ClassicUO.RestApi.Models;
 using ClassicUO.Network;
@@ -22,6 +23,7 @@ namespace ClassicUO.RestApi
 
         private bool _targeting;
         private bool _inGame;
+        private bool _shopOpen;
         private ushort _playerX;
         private ushort _playerY;
         private sbyte _playerZ;
@@ -55,6 +57,7 @@ namespace ClassicUO.RestApi
 
             PublishPlayerState();
             PublishTargetingState();
+            PublishShopState();
             PublishMobiles();
             PublishItems();
         }
@@ -135,6 +138,29 @@ namespace ClassicUO.RestApi
             {
                 _targeting = targeting;
                 _eventBus.Publish(targeting ? "target_requested" : "target_cancelled", new { targeting });
+            }
+        }
+
+        private void PublishShopState()
+        {
+            var gump = UIManager.GetGump<ShopGump>();
+            var isOpen = gump != null;
+
+            if (isOpen != _shopOpen)
+            {
+                _shopOpen = isOpen;
+                if (isOpen)
+                {
+                    _eventBus.Publish("shop_opened", new
+                    {
+                        vendorSerial = gump.LocalSerial,
+                        isBuyGump = gump.IsBuyGump,
+                    });
+                }
+                else
+                {
+                    _eventBus.Publish("shop_closed", new { });
+                }
             }
         }
 

@@ -140,6 +140,27 @@ case "$cmd" in
         _post "actions/opendoor" '{}'
         ;;
 
+    # ── Shop / Vendor ──────────────────────────────────────────────────────
+
+    # shop  — view items in currently open vendor shop
+    shop)
+        _get "shop"
+        ;;
+
+    # buy <serial> [qty]  — buy an item from the open shop
+    buy)
+        serial="${1:?Usage: uo buy <serial> [quantity]}"
+        qty="${2:-1}"
+        _post "shop/buy" "{\"items\":[{\"serial\":$serial,\"quantity\":$qty}]}"
+        ;;
+
+    # sell <serial> [qty]  — sell an item to the open shop
+    sell)
+        serial="${1:?Usage: uo sell <serial> [quantity]}"
+        qty="${2:-1}"
+        _post "shop/sell" "{\"items\":[{\"serial\":$serial,\"quantity\":$qty}]}"
+        ;;
+
     # ── Skills & Spells ───────────────────────────────────────────────────
 
     skill)
@@ -191,6 +212,11 @@ INTERACT
   uo opendoor                   Open nearest door in facing direction
   uo attack <serial>            Attack a mobile (enter war mode first)
   uo warmode [on|off]           Toggle war/peace mode
+
+SHOP / VENDOR
+  uo shop                       View items in currently open vendor shop
+  uo buy  <serial> [qty]        Buy item from open shop (say "vendor buy" first)
+  uo sell <serial> [qty]        Sell item to open shop (say "vendor sell" first)
 
 SKILLS & SPELLS
   uo skill <index>              Use a skill by index number
