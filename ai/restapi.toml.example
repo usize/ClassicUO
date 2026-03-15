@@ -1,0 +1,10 @@
+# ClassicUO REST API configuration
+# Copy this file to .restapi.toml in the repo root and fill in your values.
+# .restapi.toml is gitignored — your credentials stay local.
+
+uopath    = "/path/to/uo/data"   # folder containing UO client data files
+server    = "127.0.0.1"          # ModernUO server host
+port      = "2593"               # ModernUO server port
+username  = "myaccount"          # account name (create via ModernUO console)
+password  = "mypassword"
+character = "My Character"       # must already exist on the account
