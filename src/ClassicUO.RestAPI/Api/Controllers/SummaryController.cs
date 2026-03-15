@@ -139,9 +139,9 @@ namespace ClassicUO.RestApi.Controllers
 
             if (entities.Count > 0)
             {
-                sb.AppendLine($"  {"":1}  {"NAME",-24} {"TYPE",-10} {"DIST",5}  {"DIR",3}  {"DX",5} {"DY",5}  STATUS");
+                sb.AppendLine($"  {"":1}  {"SERIAL",-12} {"NAME",-22} {"TYPE",-10} {"DIST",4}  {"DIR",3}  {"DX",4} {"DY",4}  STATUS");
                 foreach (var e in entities)
-                    sb.AppendLine($"  {e.Glyph}  {e.Name,-24} {e.Type,-10} {e.Distance,4}t  {e.Dir,3}  {e.Dx,+5} {e.Dy,+5}  {e.Status}");
+                    sb.AppendLine($"  {e.Glyph}  0x{e.Serial:X8}  {e.Name,-22} {e.Type,-10} {e.Distance,3}t  {e.Dir,3}  {e.Dx,+4} {e.Dy,+4}  {e.Status}");
             }
             else
             {
@@ -180,7 +180,7 @@ namespace ClassicUO.RestApi.Controllers
             sb.AppendLine(new string('─', 76));
 
         private sealed record EntityRow(
-            char Glyph, string Name, string Type,
+            char Glyph, uint Serial, string Name, string Type,
             int Distance, string Dir, int Dx, int Dy, string Status);
 
         private static List<EntityRow> BuildEntityRows(WorldSnapshot snap, PlayerDto player)
@@ -201,7 +201,7 @@ namespace ClassicUO.RestApi.Controllers
                 var hp     = mob.HitsMax > 0 ? $"HP {mob.HitsPercentage}%" : "HP ?";
                 var status = $"{mob.Notoriety}  {hp}" + (flags.Count > 0 ? "  " + string.Join(" ", flags) : "");
 
-                rows.Add(new EntityRow(glyph, mob.Name, label, mob.Distance, Bearing(dx, dy), dx, dy, status));
+                rows.Add(new EntityRow(glyph, mob.Serial, mob.Name, label, mob.Distance, Bearing(dx, dy), dx, dy, status));
             }
 
             foreach (var item in snap.GroundItems.OrderBy(i => i.Distance))
@@ -211,7 +211,7 @@ namespace ClassicUO.RestApi.Controllers
                 int dy  = item.Y - player.Y;
                 var name = string.IsNullOrEmpty(item.Name) ? $"0x{item.Graphic:X4}" : item.Name;
                 var qty  = item.Amount > 1 ? $" x{item.Amount}" : "";
-                rows.Add(new EntityRow(glyph, name + qty, label, item.Distance, Bearing(dx, dy), dx, dy, ""));
+                rows.Add(new EntityRow(glyph, item.Serial, name + qty, label, item.Distance, Bearing(dx, dy), dx, dy, ""));
             }
 
             return rows;
