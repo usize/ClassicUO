@@ -72,6 +72,29 @@ case "$cmd" in
         done
         ;;
 
+    # goto <x> <y> [z]  — pathfind to world coordinates (A* around obstacles)
+    goto)
+        x="${1:?Usage: uo goto <x> <y> [z]}"
+        y="${2:?Usage: uo goto <x> <y> [z]}"
+        z="${3:-}"
+        if [[ -n "$z" ]]; then
+            _post "actions/pathfind" "{\"x\":$x,\"y\":$y,\"z\":$z}"
+        else
+            _post "actions/pathfind" "{\"x\":$x,\"y\":$y}"
+        fi
+        ;;
+
+    # follow <serial>  — pathfind to a mobile or item (stops 1 tile away)
+    follow)
+        serial="${1:?Usage: uo follow <serial>}"
+        _post "actions/pathfind" "{\"serial\":$serial}"
+        ;;
+
+    # stopwalk  — cancel any in-progress pathfinding
+    stopwalk)
+        _post "actions/stopwalk" '{}'
+        ;;
+
     # ── Speak ─────────────────────────────────────────────────────────────
 
     say)
@@ -148,6 +171,9 @@ OBSERVE
 MOVE
   uo move <dir> [run]           One step. dir: north south east west ne se sw nw
   uo walk <dir> <n> [run]       n steps with pacing (~0.4s between steps)
+  uo goto <x> <y> [z]          Pathfind to world coordinates (A* around obstacles)
+  uo follow <serial>            Pathfind to a mobile or item (stops 1 tile away)
+  uo stopwalk                   Cancel in-progress pathfinding
 
 SPEAK
   uo say    <text>              Say something aloud

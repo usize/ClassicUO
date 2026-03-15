@@ -48,6 +48,9 @@ MOVE
   ./ai/uo move <dir>         One step. dir: north south east west ne se sw nw
   ./ai/uo move <dir> run     One running step
   ./ai/uo walk <dir> <N>     N steps with pacing (good for navigating several tiles)
+  ./ai/uo goto <x> <y> [z]    Pathfind to world coordinates — A* routes around obstacles
+  ./ai/uo follow <serial>      Pathfind to a mobile or item (stops 1 tile away)
+  ./ai/uo stopwalk             Cancel any in-progress pathfinding
 
 SPEAK
   ./ai/uo say    <text>      Speak aloud (nearby players and NPCs hear you)
@@ -91,7 +94,8 @@ i = generic item
 ```
 
 **Entity list** — every visible mobile and ground item, sorted by distance.
-Columns: `GLYPH  NAME  TYPE  DIST  DIR  DX  DY  STATUS`
+Columns: `GLYPH  SERIAL  NAME  TYPE  DIST  DIR  DX  DY  STATUS`
+- `SERIAL` is shown as `0xXXXXXXXX` — use it directly with `./ai/uo use`, `./ai/uo follow`, `./ai/uo attack`, etc.
 - `DX` = tiles east (+) or west (-). `DY` = tiles south (+) or north (-).
 - `STATUS` shows notoriety (Innocent / Neutral / Criminal / Murderer / Invulnerable) and HP%.
 
@@ -152,10 +156,22 @@ Use `./ai/uo paperdoll <serial>` to infer an NPC's trade from their equipment.
 
 ## Navigation
 
-- `./ai/uo walk <dir> <n>` for multi-step movement.
-- Doors (`+`) block movement — `./ai/uo use <serial>` to open them.
-- Walls (`#`) cannot be passed.
-- Coordinates: X increases East, Y increases South.
+**Pathfinding** is the primary way to move — it routes around obstacles automatically:
+- `./ai/uo goto 1234 5678` — walk to world coordinates (reads current Z from player)
+- `./ai/uo follow 0x12345678` — walk to a specific entity by serial (stops 1 tile away)
+- `./ai/uo stopwalk` — cancel pathfinding if you need to stop mid-route
+
+**Manual stepping** for fine adjustments only:
+- `./ai/uo move <dir>` — one step, useful when already adjacent to a target
+- `./ai/uo walk <dir> <n>` — n steps in one direction, no obstacle avoidance
+
+**Doors** (`+` on map): find the door's serial in the entity list and `./ai/uo use <serial>`.
+After opening, `./ai/uo follow <door-serial>` or `./ai/uo goto <x> <y>` to pass through.
+
+**When stuck**: `./ai/uo stopwalk`, then `./ai/uo summary` to re-read the map. Look for
+`#` (wall) or `+` (door) blocking your path. Open doors, then pathfind again.
+
+Coordinates: X increases East, Y increases South.
 
 ---
 
