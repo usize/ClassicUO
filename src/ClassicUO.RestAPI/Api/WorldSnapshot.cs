@@ -69,7 +69,7 @@ namespace ClassicUO.RestApi
                 {
                     if (item == null || !item.OnGround) continue;
                     int dz = item.Z - g.PlayerZ;
-                    if (dz < -5 || dz > 19) continue; // same floor filter
+                    if (dz < -FloorFilter.ZBelow || dz > FloorFilter.ZAbove) continue;
                     int gx = item.X - g.PlayerX + RadiusX;
                     int gy = item.Y - g.PlayerY + RadiusY;
                     if (gx < 0 || gx >= Width || gy < 0 || gy >= Height) continue;
@@ -108,8 +108,6 @@ namespace ClassicUO.RestApi
             // player's current floor. Stair/bridge tiles are exempt from the floor
             // filter because they span the gap between floors and must be visible
             // from both sides so the AI knows where to walk.
-            const int ZBelow =  5;
-            const int ZAbove = 19;
             const int StairRange = 25; // wide enough to see stairs one floor away
 
             for (var obj = head; obj != null; obj = obj.TNext)
@@ -127,7 +125,7 @@ namespace ClassicUO.RestApi
                         continue; // stairs are walkable — don't mark as wall
                     }
 
-                    if (dz < -ZBelow || dz > ZAbove) continue;
+                    if (dz < -FloorFilter.ZBelow || dz > FloorFilter.ZAbove) continue;
                     if (d.IsDoor)                        hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
                     if (d.IsWet)                         hasWater = true;
@@ -144,7 +142,7 @@ namespace ClassicUO.RestApi
                         continue;
                     }
 
-                    if (dz < -ZBelow || dz > ZAbove) continue;
+                    if (dz < -FloorFilter.ZBelow || dz > FloorFilter.ZAbove) continue;
                     if (d.IsDoor)                        hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
                 }
@@ -161,6 +159,14 @@ namespace ClassicUO.RestApi
 
             return new TileClassification(glyph, hasStairUp, hasStairDown);
         }
+    }
+
+    // Z-filter constants shared across tile grid and entity lists.
+    // UO floors are ~20 Z units apart; this range isolates a single floor.
+    internal static class FloorFilter
+    {
+        public const int ZBelow =  5;   // max Z units below player to include
+        public const int ZAbove = 19;   // max Z units above player to include
     }
 
     internal sealed record WorldSnapshot(
@@ -237,9 +243,9 @@ namespace ClassicUO.RestApi
             {
                 if (mobile == null || mobile.Serial == playerSerial)
                     continue;
-                // Skip mobiles on other floors (more than one floor away)
+                // Skip mobiles on other floors
                 int dz = mobile.Z - playerZ;
-                if (dz < -20 || dz > 20) continue;
+                if (dz < -FloorFilter.ZBelow || dz > FloorFilter.ZAbove) continue;
                 list.Add(new MobileDto(mobile, world.MapIndex));
             }
 
@@ -260,7 +266,7 @@ namespace ClassicUO.RestApi
                     continue;
                 // Skip items on other floors
                 int dz = item.Z - playerZ;
-                if (dz < -20 || dz > 20) continue;
+                if (dz < -FloorFilter.ZBelow || dz > FloorFilter.ZAbove) continue;
                 list.Add(ItemDto.FromItem(item, includeContents: true));
             }
 
