@@ -24,6 +24,7 @@ namespace ClassicUO.RestApi
         private bool _targeting;
         private bool _inGame;
         private bool _shopOpen;
+        private readonly HashSet<uint> _openGumps = new();
         private ushort _playerX;
         private ushort _playerY;
         private sbyte _playerZ;
@@ -58,6 +59,7 @@ namespace ClassicUO.RestApi
             PublishPlayerState();
             PublishTargetingState();
             PublishShopState();
+            PublishGumpState();
             PublishMobiles();
             PublishItems();
         }
@@ -161,6 +163,61 @@ namespace ClassicUO.RestApi
                 {
                     _eventBus.Publish("shop_closed", new { });
                 }
+            }
+        }
+
+        private void PublishGumpState()
+        {
+            // Track server-sent gumps opening/closing
+            var currentGumps = new HashSet<uint>();
+            foreach (var gump in UIManager.Gumps)
+            {
+                if (!gump.IsFromServer) continue;
+                // Skip ShopGumps — handled separately
+                if (gump is ShopGump) continue;
+
+                currentGumps.Add(gump.LocalSerial);
+
+                if (_openGumps.Add(gump.LocalSerial))
+                {
+                    // New server gump opened — extract text for immediate feedback
+                    var textLines = new List<string>();
+                    CollectText(gump, textLines);
+
+                    _eventBus.Publish("gump_opened", new
+                    {
+                        localSerial = gump.LocalSerial,
+                        serverSerial = gump.ServerSerial,
+                        textLines,
+                    });
+                }
+            }
+
+            // Detect closed gumps
+            var closed = new List<uint>();
+            foreach (var serial in _openGumps)
+            {
+                if (!currentGumps.Contains(serial))
+                    closed.Add(serial);
+            }
+            foreach (var serial in closed)
+            {
+                _openGumps.Remove(serial);
+                _eventBus.Publish("gump_closed", new { localSerial = serial });
+            }
+        }
+
+        private static void CollectText(Game.UI.Controls.Control parent, List<string> lines)
+        {
+            foreach (var child in parent.Children)
+            {
+                if (child is Game.UI.Controls.Label lbl && !string.IsNullOrWhiteSpace(lbl.Text))
+                    lines.Add(lbl.Text);
+                else if (child is Game.UI.Controls.HtmlControl html && !string.IsNullOrWhiteSpace(html.Text))
+                    lines.Add(html.Text);
+
+                if (child.Children.Count > 0)
+                    CollectText(child, lines);
             }
         }
 
@@ -309,6 +366,7 @@ namespace ClassicUO.RestApi
             _mobiles.Clear();
             _items.Clear();
             _mobileHealth.Clear();
+            _openGumps.Clear();
         }
     }
 }
