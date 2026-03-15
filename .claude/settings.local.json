@@ -14,7 +14,8 @@
       "Bash(git add:*)",
       "Bash(./ai/uo:*)",
       "Bash(curl:*)",
-      "Skill(uo:*)"
+      "Skill(uo:*)",
+      "Bash(grep:*)"
     ]
   }
 }
