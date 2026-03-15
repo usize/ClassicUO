@@ -9,6 +9,9 @@ J="Content-Type: application/json"
 _post() { curl -s -X POST "$BASE/$1" -H "$J" -d "$2"; }
 _get()  { curl -s "$BASE/$1"; }
 
+# Convert hex (0x...) serial to decimal for JSON. Pass-through if already decimal.
+_dec() { local v="$1"; if [[ "$v" == 0x* || "$v" == 0X* ]]; then printf '%u' "$v"; else printf '%s' "$v"; fi; }
+
 # JSON-encode a string. Uses jq if available, else basic escaping.
 _jstr() {
     if command -v jq &>/dev/null; then
@@ -43,7 +46,7 @@ case "$cmd" in
         ;;
 
     paperdoll)
-        serial="${1:?Usage: uo paperdoll <serial>}"
+        serial="$(_dec "${1:?Usage: uo paperdoll <serial>}")"
         _get "world/mobiles/$serial/paperdoll"
         ;;
 
@@ -86,7 +89,7 @@ case "$cmd" in
 
     # follow <serial>  — pathfind to a mobile or item (stops 1 tile away)
     follow)
-        serial="${1:?Usage: uo follow <serial>}"
+        serial="$(_dec "${1:?Usage: uo follow <serial>}")"
         _post "actions/pathfind" "{\"serial\":$serial}"
         ;;
 
@@ -120,12 +123,12 @@ case "$cmd" in
     # ── Interact ──────────────────────────────────────────────────────────
 
     use|u)
-        serial="${1:?Usage: uo use <serial>}"
+        serial="$(_dec "${1:?Usage: uo use <serial>}")"
         _post "actions/use" "{\"serial\":$serial}"
         ;;
 
     attack)
-        serial="${1:?Usage: uo attack <serial>}"
+        serial="$(_dec "${1:?Usage: uo attack <serial>}")"
         _post "actions/attack" "{\"serial\":$serial}"
         ;;
 
@@ -143,7 +146,7 @@ case "$cmd" in
         elif [[ -n "${3:-}" ]]; then
             _post "actions/target" "{\"x\":$1,\"y\":$2,\"z\":$3}"
         else
-            _post "actions/target" "{\"serial\":$arg}"
+            _post "actions/target" "{\"serial\":$(_dec "$arg")}"
         fi
         ;;
 
@@ -161,23 +164,23 @@ case "$cmd" in
 
     # container <serial> — view contents of a container
     container)
-        serial="${1:?Usage: uo container <serial>}"
+        serial="$(_dec "${1:?Usage: uo container <serial>}")"
         _get "containers/$serial"
         ;;
 
     # grab <serial> [amount] — pick up item and put in backpack
     grab|g)
-        serial="${1:?Usage: uo grab <serial> [amount]}"
+        serial="$(_dec "${1:?Usage: uo grab <serial> [amount]}")"
         amount="${2:-0}"
         _post "actions/grab" "{\"serial\":$serial,\"amount\":$amount}"
         ;;
 
     # drop <serial> [container_serial] — drop held item into container or ground
     drop)
-        serial="${1:?Usage: uo drop <serial> [container_serial]}"
+        serial="$(_dec "${1:?Usage: uo drop <serial> [container_serial]}")"
         container="${2:-}"
         if [[ -n "$container" ]]; then
-            _post "actions/drop" "{\"serial\":$serial,\"container\":$container}"
+            _post "actions/drop" "{\"serial\":$serial,\"container\":$(_dec "$container")}"
         else
             _post "actions/drop" "{\"serial\":$serial}"
         fi
@@ -192,14 +195,14 @@ case "$cmd" in
 
     # gump-respond <localSerial> <buttonID>  — click a button on a gump
     gump-respond|gr)
-        serial="${1:?Usage: uo gump-respond <localSerial> <buttonID>}"
+        serial="$(_dec "${1:?Usage: uo gump-respond <localSerial> <buttonID>}")"
         button="${2:?Usage: uo gump-respond <localSerial> <buttonID>}"
         _post "gumps/$serial/respond" "{\"buttonID\":$button}"
         ;;
 
     # gump-close <localSerial>  — close/cancel a gump
     gump-close|gc)
-        serial="${1:?Usage: uo gump-close <localSerial>}"
+        serial="$(_dec "${1:?Usage: uo gump-close <localSerial>}")"
         curl -s -X DELETE "$BASE/gumps/$serial"
         ;;
 
@@ -212,14 +215,14 @@ case "$cmd" in
 
     # buy <serial> [qty]  — buy an item from the open shop
     buy)
-        serial="${1:?Usage: uo buy <serial> [quantity]}"
+        serial="$(_dec "${1:?Usage: uo buy <serial> [quantity]}")"
         qty="${2:-1}"
         _post "shop/buy" "{\"items\":[{\"serial\":$serial,\"quantity\":$qty}]}"
         ;;
 
     # sell <serial> [qty]  — sell an item to the open shop
     sell)
-        serial="${1:?Usage: uo sell <serial> [quantity]}"
+        serial="$(_dec "${1:?Usage: uo sell <serial> [quantity]}")"
         qty="${2:-1}"
         _post "shop/sell" "{\"items\":[{\"serial\":$serial,\"quantity\":$qty}]}"
         ;;
