@@ -54,6 +54,8 @@ namespace ClassicUO.RestApi
                 foreach (var item in world.Items.Values)
                 {
                     if (item == null || !item.OnGround) continue;
+                    int dz = item.Z - g.PlayerZ;
+                    if (dz < -5 || dz > 19) continue; // same floor filter
                     int gx = item.X - g.PlayerX + RadiusX;
                     int gy = item.Y - g.PlayerY + RadiusY;
                     if (gx < 0 || gx >= Width || gy < 0 || gy >= Height) continue;
@@ -77,22 +79,31 @@ namespace ClassicUO.RestApi
 
             bool hasDoor = false, hasWall = false, hasWater = false;
 
+            // UO floors are ~20 Z units apart. Only classify objects on the player's
+            // current floor: up to 5 units below (standing on a rug, slight terrain
+            // variance) and up to 19 units above (walls/ceiling of this floor, but
+            // not the floor above). This prevents ground-floor walls from showing
+            // when the player is on the second floor of a multi-story building.
+            const int ZBelow =  5;  // how far below player we still consider "same floor"
+            const int ZAbove = 19;  // how far above player we still consider "same floor"
+
             for (var obj = head; obj != null; obj = obj.TNext)
             {
                 if (obj is Static s)
                 {
+                    int dz = s.Z - playerZ;
+                    if (dz < -ZBelow || dz > ZAbove) continue;
                     var d = s.ItemData;
-                    // Ignore overhead roofs that are well above the player
-                    if (d.IsRoof && Math.Abs(s.Z - playerZ) > 20)
-                        continue;
-                    if (d.IsDoor)         hasDoor = true;
+                    if (d.IsDoor)                    hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
-                    if (d.IsWet)          hasWater = true;
+                    if (d.IsWet)                     hasWater = true;
                 }
                 else if (obj is Multi m)
                 {
+                    int dz = m.Z - playerZ;
+                    if (dz < -ZBelow || dz > ZAbove) continue;
                     var d = m.ItemData;
-                    if (d.IsDoor)         hasDoor = true;
+                    if (d.IsDoor)                    hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
                 }
             }
@@ -173,10 +184,14 @@ namespace ClassicUO.RestApi
             var list = new List<MobileDto>(world.Mobiles.Count);
             var playerSerial = world.Player?.Serial ?? 0;
 
+            sbyte playerZ = world.Player?.Z ?? 0;
             foreach (var mobile in world.Mobiles.Values)
             {
                 if (mobile == null || mobile.Serial == playerSerial)
                     continue;
+                // Skip mobiles on other floors (more than one floor away)
+                int dz = mobile.Z - playerZ;
+                if (dz < -20 || dz > 20) continue;
                 list.Add(new MobileDto(mobile, world.MapIndex));
             }
 
@@ -190,10 +205,14 @@ namespace ClassicUO.RestApi
 
             var list = new List<ItemDto>();
 
+            sbyte playerZ = world.Player?.Z ?? 0;
             foreach (var item in world.Items.Values)
             {
                 if (item == null || !item.OnGround)
                     continue;
+                // Skip items on other floors
+                int dz = item.Z - playerZ;
+                if (dz < -20 || dz > 20) continue;
                 list.Add(ItemDto.FromItem(item, includeContents: true));
             }
 
