@@ -269,3 +269,5 @@ Data
 # ClassicUO REST API — local config / secrets
 .restapi.toml
 src/ClassicUO.RestAPI/settings.json
+
+.cache/

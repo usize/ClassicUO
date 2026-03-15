@@ -5,7 +5,16 @@
       "Bash(dotnet restore:*)",
       "Bash(git checkout:*)",
       "Bash(python3:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/mcfoster/.local/bin/**)",
+      "WebSearch",
+      "WebFetch",
+      "mcp__read-website-fast__read_website",
+      "Bash(git add:*)",
+      "Bash(./ai/uo:*)",
+      "Bash(curl:*)",
+      "Skill(uo:*)"
     ]
   }
 }
