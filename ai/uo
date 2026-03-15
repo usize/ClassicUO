@@ -135,6 +135,11 @@ case "$cmd" in
         _post "actions/warmode" "{\"enabled\":$mode}"
         ;;
 
+    # opendoor  — open the nearest door in the direction you are facing
+    opendoor|od)
+        _post "actions/opendoor" '{}'
+        ;;
+
     # ── Skills & Spells ───────────────────────────────────────────────────
 
     skill)
@@ -183,6 +188,7 @@ SPEAK
 
 INTERACT
   uo use    <serial>            Double-click: open, talk-to, or activate
+  uo opendoor                   Open nearest door in facing direction
   uo attack <serial>            Attack a mobile (enter war mode first)
   uo warmode [on|off]           Toggle war/peace mode
 

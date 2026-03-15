@@ -21,6 +21,7 @@ namespace ClassicUO.RestApi.Models
             sbyte z,
             uint containerSerial,
             bool onGround,
+            bool isDoor,
             Layer layer,
             string name,
             int distance,
@@ -37,6 +38,7 @@ namespace ClassicUO.RestApi.Models
             Z = z;
             ContainerSerial = containerSerial;
             OnGround = onGround;
+            IsDoor = isDoor;
             Layer = layer;
             Name = name;
             Distance = distance;
@@ -53,6 +55,7 @@ namespace ClassicUO.RestApi.Models
         public sbyte Z { get; }
         public uint ContainerSerial { get; }
         public bool OnGround { get; }
+        public bool IsDoor { get; }
         public Layer Layer { get; }
         public string Name { get; }
         public int Distance { get; }
@@ -72,6 +75,7 @@ namespace ClassicUO.RestApi.Models
                 item.Z,
                 item.Container,
                 item.OnGround,
+                item.ItemData.IsDoor,
                 item.Layer,
                 item.Name ?? string.Empty,
                 item.Distance,

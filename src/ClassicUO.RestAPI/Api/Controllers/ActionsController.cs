@@ -210,6 +210,14 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
+        /// <summary>Opens the nearest door in the player's facing direction (server macro).</summary>
+        [HttpPost("opendoor")]
+        public IActionResult OpenDoor()
+        {
+            Enqueue(() => GameActions.OpenDoor());
+            return Accepted();
+        }
+
         private static World GetWorld()
         {
             return Client.Game?.UO?.World;

@@ -121,6 +121,9 @@ namespace ClassicUO.RestApi
             ushort g    = item.Graphic;
             var name    = (item.Name ?? string.Empty).ToLowerInvariant();
 
+            // Door (tiledata flag)
+            if (item.IsDoor) return ('+', "door");
+
             // Graphic-ID–based (most reliable)
             if (g >= GoldMin     && g <= GoldMax)    return ('$', "gold");
             if (g >= PotionMin   && g <= PotionMax)  return ('p', "potion");
