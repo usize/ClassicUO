@@ -218,6 +218,35 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
+        /// <summary>Respond to a targeting cursor with a serial, coordinates, or cancel.</summary>
+        [HttpPost("target")]
+        public IActionResult Target([FromBody] TargetRequest request)
+        {
+            if (request.Cancel)
+            {
+                Enqueue(() => GetWorld()?.TargetManager?.CancelTarget());
+                return Accepted();
+            }
+
+            if (request.Serial.HasValue)
+            {
+                var serial = request.Serial.Value;
+                Enqueue(() => GetWorld()?.TargetManager?.Target(serial));
+                return Accepted();
+            }
+
+            if (request.X.HasValue && request.Y.HasValue && request.Z.HasValue)
+            {
+                var x = request.X.Value;
+                var y = request.Y.Value;
+                var z = request.Z.Value;
+                Enqueue(() => GetWorld()?.TargetManager?.Target(0, x, y, z));
+                return Accepted();
+            }
+
+            return BadRequest("provide 'serial', 'x'+'y'+'z' for ground target, or 'cancel':true");
+        }
+
         private static World GetWorld()
         {
             return Client.Game?.UO?.World;

@@ -135,6 +135,18 @@ case "$cmd" in
         _post "actions/warmode" "{\"enabled\":$mode}"
         ;;
 
+    # target <serial> | target <x> <y> <z> | target cancel
+    target|t)
+        arg="${1:?Usage: uo target <serial> | uo target <x> <y> <z> | uo target cancel}"
+        if [[ "$arg" == "cancel" ]]; then
+            _post "actions/target" '{"cancel":true}'
+        elif [[ -n "${3:-}" ]]; then
+            _post "actions/target" "{\"x\":$1,\"y\":$2,\"z\":$3}"
+        else
+            _post "actions/target" "{\"serial\":$arg}"
+        fi
+        ;;
+
     # opendoor  — open the nearest door in the direction you are facing
     opendoor|od)
         _post "actions/opendoor" '{}'
@@ -210,6 +222,9 @@ SPEAK
 INTERACT
   uo use    <serial>            Double-click: open, talk-to, or activate
   uo opendoor                   Open nearest door in facing direction
+  uo target <serial>            Target a mobile or item (after spell/skill)
+  uo target <x> <y> <z>         Target ground coordinates
+  uo target cancel              Cancel targeting cursor
   uo attack <serial>            Attack a mobile (enter war mode first)
   uo warmode [on|off]           Toggle war/peace mode
 

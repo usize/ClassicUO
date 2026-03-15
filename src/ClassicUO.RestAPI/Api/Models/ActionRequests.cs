@@ -40,6 +40,18 @@ namespace ClassicUO.RestApi.Models
         public bool Enabled { get; set; }
     }
 
+    public class TargetRequest
+    {
+        /// <summary>Serial of a mobile or item to target. Mutually exclusive with coordinates.</summary>
+        public uint? Serial { get; set; }
+        /// <summary>Target ground X coordinate. Provide X+Y+Z for ground targeting.</summary>
+        public ushort? X { get; set; }
+        public ushort? Y { get; set; }
+        public short? Z { get; set; }
+        /// <summary>Set to true to cancel the current targeting cursor.</summary>
+        public bool Cancel { get; set; }
+    }
+
     public class PathfindRequest
     {
         /// <summary>Target X coordinate. Provide X+Y, or Serial, but not both.</summary>
