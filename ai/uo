@@ -152,6 +152,26 @@ case "$cmd" in
         _post "actions/opendoor" '{}'
         ;;
 
+    # ── Gumps (NPC dialogs, menus) ───────────────────────────────────────
+
+    # gumps  — list all open server gumps
+    gumps)
+        _get "gumps"
+        ;;
+
+    # gump-respond <localSerial> <buttonID>  — click a button on a gump
+    gump-respond|gr)
+        serial="${1:?Usage: uo gump-respond <localSerial> <buttonID>}"
+        button="${2:?Usage: uo gump-respond <localSerial> <buttonID>}"
+        _post "gumps/$serial/respond" "{\"buttonID\":$button}"
+        ;;
+
+    # gump-close <localSerial>  — close/cancel a gump
+    gump-close|gc)
+        serial="${1:?Usage: uo gump-close <localSerial>}"
+        curl -s -X DELETE "$BASE/gumps/$serial"
+        ;;
+
     # ── Shop / Vendor ──────────────────────────────────────────────────────
 
     # shop  — view items in currently open vendor shop
@@ -227,6 +247,11 @@ INTERACT
   uo target cancel              Cancel targeting cursor
   uo attack <serial>            Attack a mobile (enter war mode first)
   uo warmode [on|off]           Toggle war/peace mode
+
+GUMPS (NPC dialogs, menus)
+  uo gumps                      List all open server gumps (JSON)
+  uo gump-respond <id> <btn>    Click button on a gump (respond to NPC dialog)
+  uo gump-close <id>            Close/cancel a gump
 
 SHOP / VENDOR
   uo shop                       View items in currently open vendor shop
