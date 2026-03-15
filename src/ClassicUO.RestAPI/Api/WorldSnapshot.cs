@@ -9,6 +9,13 @@ using ClassicUO.Network;
 
 namespace ClassicUO.RestApi
 {
+    internal readonly struct StairInfo
+    {
+        public readonly int X, Y;
+        public readonly bool Up, Down;
+        public StairInfo(int x, int y, bool up, bool down) { X = x; Y = y; Up = up; Down = down; }
+    }
+
     // Tile grid sampled around the player on the game thread.
     // Grid is 41 wide x 21 tall (20-tile radius x, 10-tile radius y), N at top.
     // gridX=20, gridY=10 is the player's tile.
@@ -21,10 +28,14 @@ namespace ClassicUO.RestApi
         public const int Height  = RadiusY * 2 + 1; // 21
 
         // Cell values: ' '=unloaded  '.'=open  '#'=wall  '+'=door  '~'=water
+        //              '^'=stair up  'v'=stair down  'X'=stair both directions
         public readonly char[,] Cells = new char[Width, Height];
         public ushort PlayerX;
         public ushort PlayerY;
         public sbyte  PlayerZ;
+
+        /// <summary>World-coordinate stair positions visible from the current floor.</summary>
+        public readonly List<StairInfo> Stairs = new List<StairInfo>();
 
         public static readonly TileGrid Empty = new TileGrid();
 
@@ -43,7 +54,10 @@ namespace ClassicUO.RestApi
                 {
                     int wx = g.PlayerX + (gx - RadiusX);
                     int wy = g.PlayerY + (gy - RadiusY);
-                    g.Cells[gx, gy] = ClassifyTile(world, wx, wy, g.PlayerZ);
+                    var tc = ClassifyTile(world, wx, wy, g.PlayerZ);
+                    g.Cells[gx, gy] = tc.Glyph;
+                    if (tc.HasStairUp || tc.HasStairDown)
+                        g.Stairs.Add(new StairInfo(wx, wy, tc.HasStairUp, tc.HasStairDown));
                 }
             }
 
@@ -71,47 +85,81 @@ namespace ClassicUO.RestApi
             return g;
         }
 
-        private static char ClassifyTile(World world, int wx, int wy, sbyte playerZ)
+        // Result of ClassifyTile — tile glyph plus any stair info at this position.
+        internal readonly struct TileClassification
+        {
+            public readonly char Glyph;
+            public readonly bool HasStairUp;    // bridge tile leading to a higher floor
+            public readonly bool HasStairDown;  // bridge tile leading to a lower floor
+            public TileClassification(char glyph, bool up, bool down)
+                { Glyph = glyph; HasStairUp = up; HasStairDown = down; }
+        }
+
+        private static TileClassification ClassifyTile(World world, int wx, int wy, sbyte playerZ)
         {
             var head = world.Map?.GetTile(wx, wy, load: false);
             if (head == null)
-                return ' '; // chunk not loaded — leave blank
+                return new TileClassification(' ', false, false);
 
             bool hasDoor = false, hasWall = false, hasWater = false;
+            bool hasStairUp = false, hasStairDown = false;
 
-            // UO floors are ~20 Z units apart. Only classify objects on the player's
-            // current floor: up to 5 units below (standing on a rug, slight terrain
-            // variance) and up to 19 units above (walls/ceiling of this floor, but
-            // not the floor above). This prevents ground-floor walls from showing
-            // when the player is on the second floor of a multi-story building.
-            const int ZBelow =  5;  // how far below player we still consider "same floor"
-            const int ZAbove = 19;  // how far above player we still consider "same floor"
+            // UO floors are ~20 Z units apart. Only classify walls/doors on the
+            // player's current floor. Stair/bridge tiles are exempt from the floor
+            // filter because they span the gap between floors and must be visible
+            // from both sides so the AI knows where to walk.
+            const int ZBelow =  5;
+            const int ZAbove = 19;
+            const int StairRange = 25; // wide enough to see stairs one floor away
 
             for (var obj = head; obj != null; obj = obj.TNext)
             {
                 if (obj is Static s)
                 {
                     int dz = s.Z - playerZ;
-                    if (dz < -ZBelow || dz > ZAbove) continue;
                     var d = s.ItemData;
-                    if (d.IsDoor)                    hasDoor = true;
+
+                    if (d.IsBridge && Math.Abs(dz) <= StairRange)
+                    {
+                        // Bridge (stair/ramp/ladder): classify direction from player's floor
+                        if (dz > 0) hasStairUp   = true;
+                        else        hasStairDown  = true;
+                        continue; // stairs are walkable — don't mark as wall
+                    }
+
+                    if (dz < -ZBelow || dz > ZAbove) continue;
+                    if (d.IsDoor)                        hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
-                    if (d.IsWet)                     hasWater = true;
+                    if (d.IsWet)                         hasWater = true;
                 }
                 else if (obj is Multi m)
                 {
                     int dz = m.Z - playerZ;
-                    if (dz < -ZBelow || dz > ZAbove) continue;
                     var d = m.ItemData;
-                    if (d.IsDoor)                    hasDoor = true;
+
+                    if (d.IsBridge && Math.Abs(dz) <= StairRange)
+                    {
+                        if (dz > 0) hasStairUp  = true;
+                        else        hasStairDown = true;
+                        continue;
+                    }
+
+                    if (dz < -ZBelow || dz > ZAbove) continue;
+                    if (d.IsDoor)                        hasDoor = true;
                     else if (d.IsWall || d.IsImpassable) hasWall = true;
                 }
             }
 
-            if (hasDoor)  return '+';
-            if (hasWall)  return '#';
-            if (hasWater) return '~';
-            return '.';
+            char glyph;
+            if      (hasDoor)              glyph = '+';
+            else if (hasWall)              glyph = '#';
+            else if (hasWater)             glyph = '~';
+            else if (hasStairUp && hasStairDown) glyph = 'X'; // stairs in both directions
+            else if (hasStairUp)           glyph = '^';
+            else if (hasStairDown)         glyph = 'v';
+            else                           glyph = '.';
+
+            return new TileClassification(glyph, hasStairUp, hasStairDown);
         }
     }
 

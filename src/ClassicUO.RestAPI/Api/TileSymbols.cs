@@ -20,6 +20,9 @@ namespace ClassicUO.RestApi
             ['+'] = "door",
             ['~'] = "water",
             ['.'] = "open ground",
+            ['^'] = "stairs up",
+            ['v'] = "stairs down",
+            ['X'] = "stairs up+down",
 
             // Mobiles
             ['@'] = "you",

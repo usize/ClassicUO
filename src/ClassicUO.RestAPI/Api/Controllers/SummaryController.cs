@@ -133,6 +133,22 @@ namespace ClassicUO.RestApi.Controllers
                 sb.AppendLine();
             }
 
+            // ── Stairs ───────────────────────────────────────────────────────────
+            if (grid.Stairs.Count > 0)
+            {
+                Divider(sb);
+                sb.AppendLine("  STAIRS  (^ = up to next floor, v = down, X = both)");
+                foreach (var stair in grid.Stairs)
+                {
+                    int dx = stair.X - p.X;
+                    int dy = stair.Y - p.Y;
+                    var dir = Bearing(dx, dy);
+                    var kind = (stair.Up && stair.Down) ? "up+down" : stair.Up ? "up" : "down";
+                    sb.AppendLine($"  Stairs {kind,-7}  ({stair.X}, {stair.Y})  {dir}  DX {dx:+#;-#;0} DY {dy:+#;-#;0}");
+                    sb.AppendLine($"    → To go {kind}: ./ai/uo goto {stair.X} {stair.Y}");
+                }
+            }
+
             // ── Entity list ──────────────────────────────────────────────────────
             Divider(sb);
             var entities = BuildEntityRows(snap, p);
