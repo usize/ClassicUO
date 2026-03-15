@@ -39,4 +39,15 @@ namespace ClassicUO.RestApi.Models
     {
         public bool Enabled { get; set; }
     }
+
+    public class PathfindRequest
+    {
+        /// <summary>Target X coordinate. Provide X+Y, or Serial, but not both.</summary>
+        public int? X { get; set; }
+        public int? Y { get; set; }
+        /// <summary>Target Z coordinate. Defaults to player's current Z if omitted.</summary>
+        public int? Z { get; set; }
+        /// <summary>Serial of a mobile or ground item to walk toward (stops 1 tile away).</summary>
+        public uint? Serial { get; set; }
+    }
 }

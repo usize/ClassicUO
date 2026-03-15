@@ -162,6 +162,54 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
+        [HttpPost("pathfind")]
+        public IActionResult Pathfind([FromBody] PathfindRequest request)
+        {
+            if (request.Serial.HasValue)
+            {
+                var serial = request.Serial.Value;
+                Enqueue(() =>
+                {
+                    var world = GetWorld();
+                    if (world?.Player == null) return;
+
+                    int tx, ty, tz;
+                    if (world.Mobiles.TryGetValue(serial, out var mob) && mob != null && !mob.IsDestroyed)
+                    {
+                        tx = mob.X; ty = mob.Y; tz = mob.Z;
+                    }
+                    else if (world.Items.TryGetValue(serial, out var item) && item != null && !item.IsDestroyed)
+                    {
+                        tx = item.X; ty = item.Y; tz = item.Z;
+                    }
+                    else return;
+
+                    world.Player.Pathfinder.WalkTo(tx, ty, tz, 1);
+                });
+                return Accepted();
+            }
+
+            if (!request.X.HasValue || !request.Y.HasValue)
+                return BadRequest("provide 'serial' to walk to an entity, or 'x' and 'y' for coordinates");
+
+            var targetX = request.X.Value;
+            var targetY = request.Y.Value;
+            Enqueue(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return;
+                world.Player.Pathfinder.WalkTo(targetX, targetY, request.Z ?? world.Player.Z, 0);
+            });
+            return Accepted();
+        }
+
+        [HttpPost("stopwalk")]
+        public IActionResult StopWalk()
+        {
+            Enqueue(() => GetWorld()?.Player?.Pathfinder.StopAutoWalk());
+            return Accepted();
+        }
+
         private static World GetWorld()
         {
             return Client.Game?.UO?.World;
