@@ -19,7 +19,7 @@ CONFIG="$SCRIPT_DIR/.restapi.toml"
 toml_get() {
     local key="$1"
     grep -E "^[[:space:]]*${key}[[:space:]]*=" "$CONFIG" 2>/dev/null \
-        | sed 's/.*=[[:space:]]*"\?\([^"#]*\)"\?.*/\1/' \
+        | sed -E 's/.*=[[:space:]]+"?([^"#]*)"?.*/\1/' \
         | sed 's/[[:space:]]*$//' \
         | head -1
 }
