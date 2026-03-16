@@ -3,6 +3,7 @@
 ### What
 
 A version of Classic UO client running with a REST API that allows:
+
     - Text based rendering of the map
     - Interaction with the environment / control of an avatar
 
