@@ -13,6 +13,8 @@ As well as a skill for both Claude and Vibe coding harnesses.
 
 To experiment with building AI Agents that can play Ultima Online
 
+Writeup with future plans is [here](https://usize.github.io/blog/2026/march/claude-plays-uo.html)
+
 ### How
 
 See [ai/README.md](./ai/README.md)
