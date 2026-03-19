@@ -3,7 +3,9 @@
 # Usage: uo <command> [args...]
 # Requires: ClassicUO.RestAPI running locally (dotnet run --project src/ClassicUO.RestAPI)
 
-BASE="http://127.0.0.1:9000/api"
+UO_HOST="${UO_HOST:-host.docker.internal}"
+UO_PORT="${UO_PORT:-9000}"
+BASE="http://${UO_HOST}:${UO_PORT}/api"
 J="Content-Type: application/json"
 
 _post() { curl -s -X POST "$BASE/$1" -H "$J" -d "$2"; }

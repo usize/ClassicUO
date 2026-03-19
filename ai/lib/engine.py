@@ -28,7 +28,8 @@ QUEUE_PATH = AI_DIR / "escalate.queue"
 WORLD_PATH = AI_DIR / "state" / "world.json"
 RUN_PY_PATH = AI_DIR / "run.py"
 
-BASE_URL = "http://127.0.0.1:9000/api"
+import os as _os
+BASE_URL = f"http://{_os.environ.get('UO_HOST', 'host.docker.internal')}:{_os.environ.get('UO_PORT', '9000')}/api"
 
 # Tick intervals
 POLL_INTERVAL = 0.5       # seconds — world state refresh

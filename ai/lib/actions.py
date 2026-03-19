@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import aiohttp
 
-BASE = "http://127.0.0.1:9000/api"
+import os
+
+BASE = f"http://{os.environ.get('UO_HOST', 'host.docker.internal')}:{os.environ.get('UO_PORT', '9000')}/api"
 
 
 async def _post(path: str, body: dict) -> dict:
