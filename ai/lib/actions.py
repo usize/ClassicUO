@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-import aiohttp
-
 import os
 
+import aiohttp
+
 BASE = f"http://{os.environ.get('UO_HOST', 'host.docker.internal')}:{os.environ.get('UO_PORT', '9000')}/api"
+
+# aiohttp does not auto-read http_proxy env vars; pass it explicitly.
+_PROXY: str | None = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY") or None
 
 
 async def _post(path: str, body: dict) -> dict:
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{BASE}/{path}", json=body) as resp:
+        async with session.post(f"{BASE}/{path}", json=body, proxy=_PROXY) as resp:
             try:
                 return await resp.json()
             except Exception:
@@ -20,7 +23,7 @@ async def _post(path: str, body: dict) -> dict:
 
 async def _get(path: str) -> dict:
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"{BASE}/{path}") as resp:
+        async with session.get(f"{BASE}/{path}", proxy=_PROXY) as resp:
             try:
                 return await resp.json()
             except Exception:
@@ -85,3 +88,52 @@ async def grab(serial: int, amount: int = 1) -> None:
 
 async def buy(serial: int, quantity: int = 1) -> None:
     await _post("shop/buy", {"items": [{"serial": serial, "quantity": quantity}]})
+
+
+async def buy_from_vendor(
+    vendor_serial: int,
+    items: list[tuple[int, int]],
+    *,
+    approach_xy: tuple[int, int] | None = None,
+    open_timeout: float = 6.0,
+) -> bool:
+    """
+    Full buy flow in one call:
+      1. If approach_xy given, smart_goto there first (outside the building).
+      2. smart_follow the vendor to within 2 tiles.
+      3. Double-click vendor + say "vendor buy" to open shop gump.
+      4. Wait for shop gump to open (polls up to open_timeout seconds).
+      5. Send ONE batch buy request with all (serial, quantity) pairs.
+
+    Returns True if items were purchased, False if shop never opened.
+    Example:
+        await buy_from_vendor(476, [(pearl_serial, 20), (moss_serial, 20)],
+                              approach_xy=(4421, 1113))
+    """
+    import asyncio
+    from lib.nav import smart_follow, smart_goto
+
+    if approach_xy:
+        await smart_goto(approach_xy[0], approach_xy[1], timeout=60.0)
+
+    await smart_follow(vendor_serial, stop_distance=2, timeout=20.0)
+
+    # Open the shop gump
+    await use(vendor_serial)
+    await asyncio.sleep(0.8)
+    await say("vendor buy")
+
+    # Wait for gump
+    deadline = __import__("time").time() + open_timeout
+    while __import__("time").time() < deadline:
+        shop = await _get("shop")
+        if shop.get("isOpen"):
+            break
+        await asyncio.sleep(0.4)
+    else:
+        return False
+
+    # Single batch purchase
+    payload = {"items": [{"serial": s, "quantity": q} for s, q in items]}
+    await _post("shop/buy", payload)
+    return True

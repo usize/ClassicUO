@@ -74,5 +74,41 @@ namespace ClassicUO.RestApi.Controllers
             var item = WorldSnapshot.Current.GroundItems.FirstOrDefault(i => i.Serial == serial);
             return item == null ? NotFound() : Ok(item);
         }
+
+        /// <summary>
+        /// Returns the current tile grid snapshot centered on the player.
+        /// Width=41, Height=21 (RadiusX=20, RadiusY=10).
+        /// Cell values: ' '=unloaded, '.'=open, '#'=wall, '+'=door, '~'=water,
+        ///              '^'=stair up, 'v'=stair down, 'X'=stair both directions.
+        /// World coords: worldX = playerX + (colIndex - radiusX),
+        ///               worldY = playerY + (rowIndex - radiusY).
+        /// </summary>
+        [HttpGet("tiles")]
+        public IActionResult GetTiles()
+        {
+            var grid = WorldSnapshot.CurrentTileGrid;
+            var rows = new string[TileGrid.Height];
+            for (int gy = 0; gy < TileGrid.Height; gy++)
+            {
+                var sb = new System.Text.StringBuilder(TileGrid.Width);
+                for (int gx = 0; gx < TileGrid.Width; gx++)
+                {
+                    char c = grid.Cells[gx, gy];
+                    sb.Append(c == '\0' ? ' ' : c);
+                }
+                rows[gy] = sb.ToString();
+            }
+            return Ok(new
+            {
+                playerX = (int)grid.PlayerX,
+                playerY = (int)grid.PlayerY,
+                playerZ = (int)grid.PlayerZ,
+                radiusX = TileGrid.RadiusX,
+                radiusY = TileGrid.RadiusY,
+                width   = TileGrid.Width,
+                height  = TileGrid.Height,
+                rows    = rows,
+            });
+        }
     }
 }

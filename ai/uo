@@ -248,6 +248,64 @@ case "$cmd" in
     heal)       _post "actions/spell"  '{"index":4}'  ;;  # Heal
     magiclock)  _post "actions/spell"  '{"index":23}' ;;  # Magic Lock
 
+    # ── Navigation & Landmarks ────────────────────────────────────────────
+
+    # lm / landmark <query>  — goto a named landmark (fuzzy match)
+    lm|landmark)
+        query="${1:?Usage: uo lm <landmark_name_or_tag>}"
+        python3 -c "
+import sys, asyncio
+sys.path.insert(0, '$(dirname "$0")')
+from lib.nav import find_landmark, smart_goto
+
+result = find_landmark('$query')
+if result is None:
+    print('Unknown landmark: $query', file=sys.stderr)
+    sys.exit(1)
+
+key, lm = result
+approach = lm.get('approach')
+tx = approach['x'] if approach else lm['x']
+ty = approach['y'] if approach else lm['y']
+tz = approach.get('z', lm.get('z', 0)) if approach else lm.get('z', 0)
+print(f\"Navigating to {lm['name']} ({tx},{ty},{tz})\")
+arrived = asyncio.run(smart_goto(tx, ty, tz, timeout=60.0))
+print('Arrived.' if arrived else 'Timed out — check for obstacles.')
+sys.exit(0 if arrived else 1)
+"
+        ;;
+
+    # landmarks  — list all known landmarks
+    landmarks)
+        python3 -c "
+import sys, json
+sys.path.insert(0, '$(dirname "$0")')
+from lib.nav import load_landmarks, LANDMARKS_PATH
+
+db = load_landmarks()['landmarks']
+print(f'{len(db)} landmarks in {LANDMARKS_PATH}:')
+for key, lm in sorted(db.items()):
+    tags = ','.join(lm.get('tags', []))
+    print(f'  {key:35s}  {lm[\"x\"]},{lm[\"y\"]}  [{tags}]  {lm[\"name\"]}')
+"
+        ;;
+
+    # smart-goto / sg <x> <y> [z]  — pathfind with arrival detection
+    smart-goto|sg)
+        x="${1:?Usage: uo sg <x> <y> [z]}"
+        y="${2:?Usage: uo sg <x> <y> [z]}"
+        z="${3:-0}"
+        python3 -c "
+import sys, asyncio
+sys.path.insert(0, '$(dirname "$0")')
+from lib.nav import smart_goto
+print(f'Navigating to $x,$y,$z ...')
+arrived = asyncio.run(smart_goto($x, $y, $z, timeout=60.0))
+print('Arrived.' if arrived else 'Timed out.')
+sys.exit(0 if arrived else 1)
+"
+        ;;
+
     # ── Escalation Queue ──────────────────────────────────────────────────
 
     queue)
@@ -351,6 +409,11 @@ SHORTCUTS
   uo meditate                   Meditation (skill 46) — regenerate mana
   uo nightsight                 Cast Night Sight (spell 6, no reagents needed)
   uo heal                       Cast Heal (spell 4)
+
+NAVIGATION
+  uo lm <query>                 Go to a named landmark (fuzzy: "bank", "reagent", "healer")
+  uo landmarks                  List all known landmarks with coords and tags
+  uo sg <x> <y> [z]            Smart-goto: pathfind with arrival detection and door handling
 
 RUNTIME / ESCALATION QUEUE
   uo queue drain                Print all pending events and clear the queue

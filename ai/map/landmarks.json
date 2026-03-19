@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "map_notes": "Map index 1 = Trammel. Add landmarks by name key (snake_case). 'approach' is a safe tile outside any building entrance.",
+  "landmarks": {
+    "haven_spawn": {
+      "name": "Haven – spawn point",
+      "x": 4398, "y": 1099, "z": 0, "map": 1,
+      "tags": ["spawn", "safe", "haven"],
+      "notes": "Original login position for Gemma"
+    },
+    "haven_reagent_shop": {
+      "name": "Moonglow Reagent Shop (Haven)",
+      "x": 4421, "y": 1111, "z": 0, "map": 1,
+      "approach": {"x": 4421, "y": 1113},
+      "tags": ["shop", "reagents", "alchemy", "haven"],
+      "vendors": [
+        {"serial": 476, "name": "Sancia",  "sells": "all 8 reagents, potions, mortar"},
+        {"serial": 477, "name": "Alcina",  "sells": "unknown"},
+        {"serial": 478, "name": "Chuck",   "sells": "unknown"}
+      ],
+      "notes": "Door at 4423,1111. Stand at approach tile, use vendor serial, say 'vendor buy'."
+    },
+    "haven_weapon_shop": {
+      "name": "The Mighty Axe (Haven weapon shop)",
+      "x": 4400, "y": 1115, "z": 0, "map": 1,
+      "tags": ["shop", "weapons", "haven"],
+      "notes": "Sign at 4400,1115. Entrance likely from south."
+    },
+    "haven_mage_shop": {
+      "name": "The Mage's Seat (Haven magic shop)",
+      "x": 4414, "y": 1096, "z": 0, "map": 1,
+      "approach": {"x": 4415, "y": 1097},
+      "tags": ["shop", "magic", "spells", "haven"],
+      "notes": "Sign at 4414,1096. Doors at 4415,1095 and 4416,1095."
+    },
+    "haven_healer": {
+      "name": "Haven Healer",
+      "x": 4394, "y": 1082, "z": 0, "map": 1,
+      "tags": ["healer", "haven", "safe"],
+      "vendors": [
+        {"serial": 167, "name": "Len", "title": "healer guildmaster"},
+        {"serial": 168, "name": "Drew", "title": "healer"}
+      ],
+      "notes": "Len and Drew are healers. Use them when dead."
+    },
+    "haven_misc_npcs": {
+      "name": "Haven misc NPCs area",
+      "x": 4393, "y": 1116, "z": 0, "map": 1,
+      "tags": ["haven", "npc"],
+      "vendors": [
+        {"serial": 143, "name": "Sidney"},
+        {"serial": 144, "name": "Adonis"},
+        {"serial": 36365, "name": "Benson"}
+      ]
+    }
+  }
+}
