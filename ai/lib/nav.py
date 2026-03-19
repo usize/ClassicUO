@@ -30,7 +30,7 @@ _DIR_DELTA = {
 # Reverse lookup: (dx, dy) → direction index
 _DELTA_DIR = {v: k for k, v in _DIR_DELTA.items()}
 
-MOVE_DELAY = 0.35   # seconds between move steps (~UO walk speed)
+MOVE_DELAY = 0.5    # seconds between move steps (generous to let server process each move)
 DOOR_RANGE = 2      # tiles within which we open doors
 
 # A* search limits
@@ -299,20 +299,21 @@ async def smart_goto(
     or the target is out of range.
 
     Algorithm:
-    - Each iteration: fetch tile grid, run A* to target (or toward target if
-      out of grid range), follow next waypoint in planned path.
-    - Replan every ~10 steps or when stuck.
-    - On stuck: scan all 8 directions in proximity order until one produces
-      movement, commit to that direction for a few steps.
-    - Opens nearby doors when stuck or when path passes through a door tile.
+    - On first step and every REPLAN_EVERY steps: fetch tile grid once, run A*.
+    - Follow planned waypoints. Before stepping onto a door tile (known from the
+      grid fetched at plan time), open nearby doors first.
+    - On stuck ≥2: scan all 8 directions; commit to escape dir for a few steps.
     - Timeout after `timeout` seconds. Returns True on arrival, False on timeout.
     """
+    REPLAN_EVERY = 12  # replan A* every N successful steps
+
     deadline = time.time() + timeout
     last_pos: tuple[int, int] | None = None
     stuck_count = 0
     committed_dir: int | None = None
     committed_steps = 0
-    path: list[tuple[int, int]] = []
+    path: list[tuple[int, int]] = []        # remaining world-coord waypoints
+    door_tiles: set[tuple[int, int]] = set()  # waypoints that are doors
     steps_since_replan = 0
 
     while time.time() < deadline:
@@ -334,6 +335,16 @@ async def smart_goto(
             if last_pos is not None:
                 stuck_count += 1
 
+            # Committed direction stopped working — abandon it so we can scan again
+            if committed_dir is not None and stuck_count >= 3:
+                committed_dir = None
+                path = []
+                door_tiles = set()
+
+            # Force replan if stuck without a path for too long
+            if stuck_count >= 5 and not path:
+                stuck_count = 0  # reset so we don't spam replans
+
             # Open doors every 3 stuck steps
             if stuck_count > 0 and stuck_count % 3 == 0:
                 await _open_nearby_doors()
@@ -349,10 +360,12 @@ async def smart_goto(
                     nx, ny, _ = await player_pos()
                     if (nx, ny) != (px, py):
                         committed_dir = candidate
-                        committed_steps = 3
+                        committed_steps = 4
                         last_pos = (nx, ny)
-                        path = []  # invalidate current plan
+                        path = []
+                        door_tiles = set()
                         steps_since_replan = 0
+                        stuck_count = 0
                         break
                 continue
 
@@ -364,43 +377,43 @@ async def smart_goto(
             await asyncio.sleep(MOVE_DELAY)
             continue
 
-        # Replan path when empty or stale
-        if not path or steps_since_replan >= 10:
+        # Replan A* when path is empty or stale (one grid fetch per replan)
+        if not path or steps_since_replan >= REPLAN_EVERY:
             grid = await fetch_tile_grid()
             if grid and grid.get("rows"):
-                new_path = _astar(
-                    grid["rows"],
-                    grid["playerX"], grid["playerY"],
-                    grid["radiusX"], grid["radiusY"],
-                    x, y,
-                )
+                rows = grid["rows"]
+                rx, ry = grid["radiusX"], grid["radiusY"]
+                gpx, gpy = grid["playerX"], grid["playerY"]
+                new_path = _astar(rows, gpx, gpy, rx, ry, x, y)
                 if new_path:
                     path = new_path
+                    # Mark door waypoints from the freshly fetched grid
+                    door_tiles = set()
+                    for wx, wy in path:
+                        gx = wx - gpx + rx
+                        gy = wy - gpy + ry
+                        if _grid_is_door(rows, gx, gy):
+                            door_tiles.add((wx, wy))
                 else:
                     path = []
+                    door_tiles = set()
             else:
                 path = []
+                door_tiles = set()
             steps_since_replan = 0
 
         # Advance along path or fall back to greedy
         if path:
-            # Skip waypoints we've already passed (within 1 tile)
+            # Skip waypoints already reached (within 1 tile)
             while path and max(abs(px - path[0][0]), abs(py - path[0][1])) <= 1:
                 path.pop(0)
 
             if path:
                 wx, wy = path[0]
-                # Open door if next step is a door
-                grid = await fetch_tile_grid()
-                if grid and grid.get("rows"):
-                    rows = grid["rows"]
-                    rx, ry = grid["radiusX"], grid["radiusY"]
-                    gx = wx - grid["playerX"] + rx
-                    gy = wy - grid["playerY"] + ry
-                    if _grid_is_door(rows, gx, gy):
-                        await _open_nearby_doors()
-                        await asyncio.sleep(0.3)
-
+                # Open door before stepping onto a door tile
+                if (wx, wy) in door_tiles:
+                    await _open_nearby_doors()
+                    await asyncio.sleep(0.3)
                 dir_idx = _dir_to_waypoint(px, py, wx, wy)
             else:
                 dir_idx = _best_direction(px, py, x, y)
