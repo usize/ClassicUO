@@ -62,6 +62,19 @@ async def cast(spell: int) -> None:
     await _post("actions/spell", {"index": spell})
 
 
+async def target(serial: int) -> None:
+    """Respond to a targeting cursor with a mobile/item serial."""
+    await _post("actions/target", {"serial": serial})
+
+
+async def cast_at(spell: int, serial: int, delay: float = 0.6) -> None:
+    """Cast a targeted spell at a specific serial. Waits `delay` seconds for targeting mode."""
+    import asyncio
+    await cast(spell)
+    await asyncio.sleep(delay)
+    await target(serial)
+
+
 async def heal() -> None:
     await cast(4)
 

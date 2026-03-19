@@ -9,7 +9,7 @@ Return False to pass control to the next rule.
 
 from __future__ import annotations
 
-from lib.actions import cast, heal, meditate, move, warmode
+from lib.actions import cast, cast_at, heal, meditate, move, target, warmode
 from lib.models import WorldState
 
 # Directions to flee south (cycle through to escape)
@@ -19,7 +19,8 @@ _flee_idx = 0
 
 async def survive(world: WorldState) -> bool:
     """
-    PRIORITY: HIGHEST. Cast Heal if HP below 40%. Flee south if HP below 20%.
+    PRIORITY: HIGHEST. Cast Heal (self-targeted) if HP below 40%.
+    Flee south AND heal if HP below 20%.
     Returns True if this rule fired (suppresses lower rules).
     """
     global _flee_idx
@@ -27,14 +28,14 @@ async def survive(world: WorldState) -> bool:
 
     if hp < 0.20:
         # Critical — heal AND flee
-        await heal()
+        await cast_at(4, world.player.serial)  # Heal, targeted at self
         dir_ = _FLEE_DIRS[_flee_idx % len(_FLEE_DIRS)]
         _flee_idx += 1
         await move(dir_, run=True)
         return True
 
     if hp < 0.40:
-        await heal()
+        await cast_at(4, world.player.serial)  # Heal, targeted at self
         return True
 
     return False
@@ -42,18 +43,18 @@ async def survive(world: WorldState) -> bool:
 
 async def defend(world: WorldState) -> bool:
     """
-    Cast Magic Arrow (spell 5) at nearest hostile within 3 tiles if HP above 60%.
-    Does NOT fire if war mode is off and no target is in range.
+    Cast Magic Arrow (spell 5) at nearest hostile within 8 tiles if HP above 60%.
+    Targets the hostile via the targeting cursor after casting.
     """
     if world.player.hp_pct < 0.60:
         return False
 
-    hostile = world.nearest_hostile(within=3)
+    hostile = world.nearest_hostile(within=8)
     if not hostile:
         return False
 
     await warmode(True)
-    await cast(5)  # Magic Arrow
+    await cast_at(5, hostile.serial)  # Magic Arrow at hostile
     return True
 
 
