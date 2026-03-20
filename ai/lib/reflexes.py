@@ -71,3 +71,50 @@ async def recover_mana(world: WorldState) -> bool:
 
     await meditate()
     return True
+
+
+# Tracks the last journal entry we replied to, so we don't loop-respond to the same line.
+_last_responded_ts: str = ""
+
+
+async def respond_to_player(world: WorldState) -> bool:
+    """
+    Escalate (and optionally acknowledge) if a human player spoke to us in the last 8 seconds.
+    Fires above task rules so conversation preempts grinding.
+
+    Does NOT auto-reply — just escalates so Claude wakes up and decides what to say.
+    Returns True to pause lower rules for this tick (gives Claude a moment to respond).
+    """
+    global _last_responded_ts
+    import time
+    from lib.engine import escalate
+
+    for entry in reversed(world.journal):
+        # Skip our own messages and system messages (no speaker)
+        if not entry.speaker or entry.speaker == world.player.name:
+            continue
+        # Skip if we already reacted to this entry
+        if entry.timestamp == _last_responded_ts:
+            break
+        # Check recency
+        try:
+            from datetime import datetime, timezone
+            ts = datetime.fromisoformat(entry.timestamp.replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - ts).total_seconds()
+            if age > 8:
+                break
+        except Exception:
+            break
+
+        _last_responded_ts = entry.timestamp
+        await escalate(
+            "player_speaking",
+            speaker=entry.speaker,
+            message=entry.message,
+            ts=entry.timestamp,
+        )
+        return True  # pause lower rules this tick
+
+    return False

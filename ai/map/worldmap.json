@@ -1,0 +1,116 @@
+{
+  "facet": "Trammel",
+  "map_id": 1,
+  "dimensions": "6144x4096",
+  "notes": "Coordinates are world coordinates (X increases East, Y increases South). Moonglow is on an island in the east. Use moongates for fast travel between cities.",
+  "locations": {
+    "cities": [
+      {
+        "name": "Britain",
+        "center": { "x": 1437, "y": 1690 },
+        "sub_locations": [
+          { "name": "First Bank of Britain (West)", "x": 1427, "y": 1685 },
+          { "name": "East Britain Bank", "x": 1653, "y": 1605 },
+          { "name": "Britain Cemetery", "x": 1367, "y": 1474 },
+          { "name": "Castle Britannia Entrance", "x": 1323, "y": 1624 },
+          { "name": "Lord British's Throne Room", "x": 1323, "y": 1624 },
+          { "name": "Cat's Lair Tavern", "x": 1424, "y": 1718 },
+          { "name": "Blue Boar Inn", "x": 1492, "y": 1687 },
+          { "name": "Britain Sewers (T2A Entrance)", "x": 1493, "y": 1641 },
+          { "name": "West Britain Stables", "x": 1516, "y": 1549 },
+          { "name": "Britain Public Library", "x": 1413, "y": 1600 },
+          { "name": "Blacksmith Guild", "x": 1355, "y": 1777 },
+          { "name": "Healer of Britain", "x": 1473, "y": 1613 }
+        ]
+      },
+      {
+        "name": "Moonglow",
+        "center": { "x": 4412, "y": 1162 },
+        "sub_locations": [
+          { "name": "Moonglow Bank", "x": 4474, "y": 1163 },
+          { "name": "Moonglow Cemetery", "x": 4543, "y": 1318 },
+          { "name": "The Lycaeum (Library)", "x": 4311, "y": 1001 },
+          { "name": "Moonglow Zoo", "x": 4514, "y": 1376 },
+          { "name": "Telescope / Observatory", "x": 4708, "y": 1118 },
+          { "name": "Healer Shop", "x": 4437, "y": 1092 }
+        ]
+      },
+      {
+        "name": "Trinsic",
+        "center": { "x": 1845, "y": 2772 },
+        "sub_locations": [
+          { "name": "Trinsic Royal Bank", "x": 1896, "y": 2687 },
+          { "name": "Trinsic Cemetery (South)", "x": 1836, "y": 2901 },
+          { "name": "Meeting Hall", "x": 1894, "y": 2720 },
+          { "name": "Trinsic Stables", "x": 1827, "y": 2843 },
+          { "name": "The Paladin Hall", "x": 2018, "y": 2747 }
+        ]
+      },
+      {
+        "name": "New Haven",
+        "center": { "x": 3503, "y": 2574 },
+        "sub_locations": [
+          { "name": "New Haven Bank", "x": 3485, "y": 2571 },
+          { "name": "Magery School", "x": 3477, "y": 2496 },
+          { "name": "Blacksmith Shop", "x": 3523, "y": 2535 },
+          { "name": "Healers", "x": 3462, "y": 2559 },
+          { "name": "Old Haven Ruins (Zombies)", "x": 3724, "y": 2501 }
+        ]
+      },
+      {
+        "name": "Vesper",
+        "center": { "x": 2895, "y": 676 },
+        "sub_locations": [
+          { "name": "Mint of Vesper (Bank)", "x": 2880, "y": 683 },
+          { "name": "Vesper Cemetery", "x": 2749, "y": 858 },
+          { "name": "Ironwood Inn", "x": 2782, "y": 963 },
+          { "name": "Fisherman's Council", "x": 2960, "y": 815 },
+          { "name": "Lost Lands Tunnel Entrance", "x": 2770, "y": 890 }
+        ]
+      },
+      {
+        "name": "Yew",
+        "center": { "x": 545, "y": 985 },
+        "sub_locations": [
+          { "name": "Yew Bank", "x": 551, "y": 993 },
+          { "name": "Empath Abbey", "x": 643, "y": 820 },
+          { "name": "Court of Truth", "x": 618, "y": 1004 },
+          { "name": "Yew Cemetery", "x": 693, "y": 1134 },
+          { "name": "The Bee Farm", "x": 609, "y": 1133 }
+        ]
+      }
+    ],
+    "moongates": [
+      { "name": "Britain Moongate", "x": 1338, "y": 1997 },
+      { "name": "Moonglow Moongate", "x": 4467, "y": 1283 },
+      { "name": "Trinsic Moongate", "x": 1828, "y": 2948 },
+      { "name": "Skara Brae Moongate", "x": 596, "y": 2091 },
+      { "name": "Magincia Moongate", "x": 3563, "y": 2139 },
+      { "name": "Jhelom Moongate", "x": 1499, "y": 3771 },
+      { "name": "Yew Moongate", "x": 771, "y": 753 },
+      { "name": "Minoc Moongate", "x": 2701, "y": 692 },
+      { "name": "New Haven Moongate", "x": 3450, "y": 2677 }
+    ],
+    "dungeons": [
+      { "name": "Covetous", "x": 2498, "y": 921 },
+      { "name": "Deceit", "x": 4111, "y": 432 },
+      { "name": "Despise", "x": 1301, "y": 1080 },
+      { "name": "Destard", "x": 1176, "y": 2640 },
+      { "name": "Hythloth", "x": 4721, "y": 3822 },
+      { "name": "Shame", "x": 511, "y": 1561 },
+      { "name": "Wrong", "x": 2043, "y": 214 },
+      { "name": "Fire Dungeon", "x": 2923, "y": 3409 },
+      { "name": "Ice Dungeon", "x": 1999, "y": 81 }
+    ],
+    "shrines": [
+      { "name": "Compassion", "x": 1858, "y": 875 },
+      { "name": "Honesty", "x": 4125, "y": 219 },
+      { "name": "Honor", "x": 1728, "y": 3528 },
+      { "name": "Humility", "x": 4274, "y": 3698 },
+      { "name": "Justice", "x": 1300, "y": 644 },
+      { "name": "Sacrifice", "x": 3355, "y": 290 },
+      { "name": "Spirituality", "x": 1538, "y": 2472 },
+      { "name": "Valor", "x": 2493, "y": 3931 }
+    ]
+  }
+}

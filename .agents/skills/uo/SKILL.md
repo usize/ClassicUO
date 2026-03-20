@@ -18,6 +18,229 @@ Then `./ai/uo player` to read your character's full stats and skills.
 
 ---
 
+## Session Start — Always Do These First
+
+```bash
+./ai/uo queue drain    # read all pending events, then clear the queue
+./ai/uo summary        # orient: map, entities, journal
+./ai/uo player         # stats, skills, HP/MP
+```
+
+**Read the queue first.** Macros write events to `ai/escalate.queue` while they run.
+The queue tells you what happened since you last checked in:
+
+| Event | Meaning |
+|-------|---------|
+| `macro_start` | A macro began running |
+| `macro_complete` | A macro finished normally |
+| `macro_blocked` | A macro gave up (couldn't navigate, shop never opened, etc.) |
+| `heartbeat` | Periodic check-in from a running macro with current stats |
+| `hp_critical` | Player HP dropped below 25% |
+| `player_speaking` | A human player said something in chat |
+| `script_error` | `run.py` crashed — reflex runtime fell back to survive+defend |
+
+If the queue is empty, a macro hasn't run since the last session, or everything is fine.
+If there are `macro_blocked` or `hp_critical` events, investigate before running anything.
+
+---
+
+## Two Action Tiers
+
+### Tier 1 — The Reflex Engine (always running)
+
+`python3 ai/runtime.py` runs continuously in the background. It evaluates `run.py`
+every 100ms, firing the first matching rule and skipping the rest (subsumption).
+
+**This is how ongoing behavior works.** The engine handles real-time interruption:
+if a player speaks, `respond_to_player` fires and escalates *before* the training
+rule even gets a chance to run. Survival preempts everything.
+
+Default priority stack in `run.py`:
+```
+survive            ← always-on: heal/flee on low HP
+respond_to_player  ← pause task if a human speaks; writes to queue for Claude to reply
+defend             ← attack nearest hostile if HP ok
+recover_mana       ← meditate if MP low
+<your task rules>  ← training, navigation, shopping — Claude writes these
+```
+
+Claude's job is to **write the task rules at the bottom** of this stack. The engine
+hot-reloads `run.py` the moment Claude saves it.
+
+**Start the engine:**
+```bash
+python3 ai/runtime.py &   # or in a separate terminal
+```
+
+### Tier 2 — Inline Macros (one-shot actions)
+
+For single-completion tasks (navigate to the shop, buy reagents once, cast one spell),
+write a Python asyncio script and run it directly. It runs alongside the engine — the
+engine keeps watching for threats while the macro does its work.
+
+**Why not `./ai/uo` command chains?**
+- Scripts run a complete workflow as a single bash call — no per-step round-trips
+- Interrupting the bash tool kills the Python process instantly — instant, safe stop
+- Logic lives in one place: observe → decide → execute all in one script
+
+### Inline scripts for one-off actions
+
+Write a self-contained script as a bash heredoc and pipe it to python3:
+
+```bash
+python3 - <<'EOF'
+import asyncio, sys
+sys.path.insert(0, "ai")
+from lib.nav import smart_goto, player_pos
+from lib.actions import emote, say
+
+async def main():
+    x, y, _ = await player_pos()
+    print(f"Starting at ({x}, {y})")
+    await emote("sets off at a brisk pace toward the market")
+    await smart_goto(4421, 1113, timeout=120, run=True)
+    await say("Pardon me. I am looking for reagents.")
+
+asyncio.run(main())
+EOF
+```
+
+The `<<'EOF'` heredoc is the cleanest multi-line form — no quoting issues.
+Always add `2>&1` if you want stderr visible.
+
+### The macro library: `ai/macros/`
+
+Reusable one-shot scripts. Run them directly:
+
+```bash
+python3 ai/macros/buy_reagents.py
+python3 ai/macros/meditate_full.py
+```
+
+**When to use a macro vs a run.py rule:**
+
+| Use case | Tier |
+|----------|------|
+| Navigate to the shop and buy reagents (finishes cleanly) | Macro |
+| Train Magery for 30 minutes, respond to players mid-session | `run.py` rule |
+| Meditate once until full | Macro |
+| Patrol an area indefinitely | `run.py` rule |
+| Go fetch a specific item | Macro |
+
+The rule of thumb: **if it loops indefinitely and you want the character to be
+responsive during it, it belongs in `run.py`.**
+
+**Current macros** (check `ls ai/macros/` for the latest):
+- `buy_reagents.py` — navigate to Sancia, buy standard reagent stock
+- `meditate_full.py` — meditate until mana is full
+
+### Available library modules
+
+```python
+from lib.actions import (
+    move, goto, follow, stopwalk, say, emote, use,
+    cast, heal, nightsight, meditate, attack, warmode,
+    grab, buy, buy_from_vendor, cast_at, target,
+)
+from lib.nav import smart_goto, smart_follow, player_pos
+from lib.reflexes import survive, defend, recover_mana
+from lib.models import WorldState
+```
+
+The `smart_goto(x, y, z=0, timeout=60, run=False)` function handles long-distance
+navigation with automatic door-opening and hopped pathfinding. Use it for any trip
+longer than a few tiles.
+
+### Macro script template
+
+```python
+#!/usr/bin/env python3
+"""One-line description of what this macro does."""
+import asyncio, sys
+sys.path.insert(0, "ai")
+
+from lib.actions import say, emote
+from lib.nav import smart_goto, player_pos
+
+async def main() -> None:
+    x, y, _ = await player_pos()
+    print(f"Starting at ({x}, {y})")
+    # ... your logic here ...
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+```
+
+---
+
+## Observation: `./ai/uo` commands
+
+Use `./ai/uo` for **reading** world state. These are fast, non-interactive reads.
+
+```
+./ai/uo summary            Full world view: ASCII map, entity list, last 20 journal lines
+./ai/uo player             Detailed stats and skills (JSON)
+./ai/uo journal [N]        Last N journal entries (default: all recent)
+./ai/uo mobiles            All visible mobiles as JSON
+./ai/uo paperdoll <serial> Equipment worn by a nearby mobile (JSON)
+./ai/uo status             Connection state (JSON)
+```
+
+For quick single commands (one move, one say), `./ai/uo` is also fine:
+
+```
+./ai/uo say "Greetings, traveler."
+./ai/uo emote "peers at the map curiously"
+./ai/uo move north
+./ai/uo warmode off
+./ai/uo stopwalk
+```
+
+---
+
+## Reading the World: `./ai/uo summary`
+
+**Status bar** — connection state, server name, uptime.
+
+**Player line** — name, coordinates, facing, HP/MP/Stamina, top skills.
+
+**ASCII map** — 41 wide × 21 tall. You are `@` at center. North is up.
+```
+# = wall or impassable      . = open ground (walkable)
++ = door                    ~ = water
+
+@ = you    G = guard    N = NPC/vendor    H = human player
+M = hostile creature    A = animal    % = corpse
+$ = gold    p = potion    r = reagent    s = scroll
+b = bandage    C = container    w = weapon    a = armor    f = food
+i = generic item
+```
+
+**Entity list** — every visible mobile and item, sorted by distance.
+`GLYPH  SERIAL  NAME  TYPE  DIST  DIR  DX  DY  STATUS`
+- `SERIAL` shown as `0xXXXXXXXX` — pass directly to lib or `./ai/uo` commands
+- `DX` = tiles east (+) or west (–). `DY` = tiles south (+) or north (–).
+- `STATUS` shows notoriety and HP%
+
+**Journal** — last 20 lines of chat and system messages.
+
+---
+
+## The Session Loop
+
+1. **Observe** — `./ai/uo summary` to orient.
+2. **Reason** — What's the best use of time? Training? Shopping? Exploring? Talking?
+3. **Act** — Write and run a Python script to execute the plan.
+4. **Verify** — `./ai/uo summary` or `./ai/uo journal` to see what happened.
+5. **Narrate** — Tell the human what you did and what you plan next. Keep it vivid.
+
+Scripts handle multi-step flows end-to-end. Observe before and after, not during.
+
+---
+
 ## Roleplay and Personality
 
 Inhabit the character fully. Read their name, class, and skill set from the API and
@@ -30,101 +253,10 @@ Use emotes freely to add personality.
 
 ---
 
-## The `./ai/uo` Command
+## Spells and Reagents
 
-All interaction happens through `./ai/uo` from the repo root. It talks to the REST API
-at `http://127.0.0.1:9000`. Never construct raw curl calls — always use `./ai/uo`.
-
-```
-OBSERVE
-  ./ai/uo summary            Full world view: ASCII map, entity list, last 20 journal lines
-  ./ai/uo player             Detailed stats and skills (JSON)
-  ./ai/uo journal [N]        Last N journal entries (default: all recent)
-  ./ai/uo mobiles            All visible mobiles as JSON
-  ./ai/uo paperdoll <serial> Equipment worn by a nearby mobile (JSON)
-  ./ai/uo status             Connection state (JSON)
-
-MOVE
-  ./ai/uo move <dir>         One step. dir: north south east west ne se sw nw
-  ./ai/uo move <dir> run     One running step
-  ./ai/uo walk <dir> <N>     N steps with pacing (good for navigating several tiles)
-  ./ai/uo goto <x> <y> [z]    Pathfind to world coordinates — A* routes around obstacles
-  ./ai/uo follow <serial>      Pathfind to a mobile or item (stops 1 tile away)
-  ./ai/uo stopwalk             Cancel any in-progress pathfinding
-
-SPEAK
-  ./ai/uo say    <text>      Speak aloud (nearby players and NPCs hear you)
-  ./ai/uo yell   <text>      Yell (wider range)
-  ./ai/uo whisper <text>     Whisper (only adjacent entities hear)
-  ./ai/uo emote  <text>      Emote action
-
-INTERACT
-  ./ai/uo use <serial>       Double-click: open containers, talk to NPCs, activate items
-  ./ai/uo attack <serial>    Attack a mobile
-  ./ai/uo warmode on/off     Toggle war/peace mode
-
-SKILLS & SPELLS
-  ./ai/uo skill <index>      Use a skill by index
-  ./ai/uo cast <number>      Cast a magery spell by number
-  ./ai/uo meditate           Shortcut: Meditation (skill 46)
-  ./ai/uo nightsight         Shortcut: Night Sight (spell 6, no reagents needed)
-  ./ai/uo heal               Shortcut: Heal (spell 4)
-```
-
----
-
-## Reading the World: `./ai/uo summary`
-
-Always start with `./ai/uo summary`. It returns three sections:
-
-**Status bar** — connection state, server name, uptime.
-
-**Player line** — character name, coordinates, facing direction, HP/MP/Stamina, top skills.
-
-**ASCII map** — 41 wide × 21 tall. You are `@` at the center. North is up.
-```
-# = wall or impassable terrain      . = open ground (walkable)
-+ = door (use its serial to open)   ~ = water
-
-@ = you          G = guard (invulnerable, protects you)
-N = NPC/vendor   H = human player   M = hostile creature   A = animal
-% = corpse       $ = gold    p = potion   r = reagent   s = scroll
-b = bandage      C = container      w = weapon    a = armor    f = food
-i = generic item
-```
-
-**Entity list** — every visible mobile and ground item, sorted by distance.
-Columns: `GLYPH  SERIAL  NAME  TYPE  DIST  DIR  DX  DY  STATUS`
-- `SERIAL` is shown as `0xXXXXXXXX` — use it directly with `./ai/uo use`, `./ai/uo follow`, `./ai/uo attack`, etc.
-- `DX` = tiles east (+) or west (-). `DY` = tiles south (+) or north (-).
-- `STATUS` shows notoriety (Innocent / Neutral / Criminal / Murderer / Invulnerable) and HP%.
-
-**Journal** — last 20 lines of chat and system messages.
-Read this after every action: NPC replies, skill gains, spell results.
-
----
-
-## The Game Loop
-
-1. **Observe** — `./ai/uo summary` to read the full world state.
-2. **Reason** — What changed? Who is nearby? What is the best action right now?
-3. **Act** — One meaningful action: move, speak, use a skill, interact with someone.
-4. **Verify** — `./ai/uo journal` or `./ai/uo summary` to confirm the result.
-5. **Narrate** — Tell the human what you did, what you saw, what you plan next.
-
-One action → verify → one action → verify. UO is reactive; don't chain blindly.
-
----
-
-## Skills and Spells
-
-Skills improve by use — repeat until the server grants a gain (can take many attempts).
-Check your character's skill set with `./ai/uo player` and train whichever are relevant.
-
-**Buying from NPCs**: Vendors can raise skills up to 40. Find a relevant NPC (N on map),
-`./ai/uo use <serial>`, then `./ai/uo say "train"`.
-
-**Mage spells quick reference** (if playing a mage):
+Spells cost mana and consume reagents from your backpack. Night Sight is the exception —
+no reagents needed, safe for repeated training.
 
 | Spell | Index | Reagents |
 |-------|-------|---------|
@@ -135,71 +267,60 @@ Check your character's skill set with `./ai/uo player` and train whichever are r
 | Fireball | 22 | Black Pearl |
 | Magic Lock | 23 | Blood Moss, Garlic, Black Pearl |
 
-Reagents are sold by herbalists and alchemists (N on map). `./ai/uo use <serial>` to
-open their shop, then `./ai/uo say "buy"`.
-
 **Skill index quick reference:**
 `0=Alchemy  16=Eval Int  17=Healing  23=Inscription  25=Magery  46=Meditation`
 
 ---
 
-## Talking to People
+## Navigation Notes
 
-**NPCs**: `./ai/uo use <serial>` to open the trade/talk window.
-- `./ai/uo say "vendor"` or `./ai/uo say "buy"` — open their shop
-- `./ai/uo say "train"` — buy skill points
-Use `./ai/uo paperdoll <serial>` to infer an NPC's trade from their equipment.
-
-**Players (H on map)**: Real people. Be genuine. Greet them, ask what they're doing.
-
----
-
-## Navigation
-
-**Pathfinding** is the primary way to move — it routes around obstacles automatically:
-- `./ai/uo goto 1234 5678` — walk to world coordinates (reads current Z from player)
-- `./ai/uo follow 0x12345678` — walk to a specific entity by serial (stops 1 tile away)
-- `./ai/uo stopwalk` — cancel pathfinding if you need to stop mid-route
-
-**Manual stepping** for fine adjustments only:
-- `./ai/uo move <dir>` — one step, useful when already adjacent to a target
-- `./ai/uo walk <dir> <n>` — n steps in one direction, no obstacle avoidance
-
-**Doors** (`+` on map): find the door's serial in the entity list and `./ai/uo use <serial>`.
-After opening, `./ai/uo follow <door-serial>` or `./ai/uo goto <x> <y>` to pass through.
-
-**When stuck**: `./ai/uo stopwalk`, then `./ai/uo summary` to re-read the map. Look for
-`#` (wall) or `+` (door) blocking your path. Open doors, then pathfind again.
-
-Coordinates: X increases East, Y increases South.
+- `smart_goto(x, y, run=True)` handles multi-hop pathfinding with automatic door-opening
+- Coordinates: X increases East, Y increases South
+- **World map**: `ai/map/worldmap.json` — all cities, moongates, dungeons, shrines for Trammel
+- **Local landmarks**: `ai/map/landmarks.json` — Moonglow/Haven vendors, healers, approach tiles
+- **Current location**: Moonglow island (x≈4400). Moonglow Moongate at (4467, 1283).
+- **Inter-city travel**: walk to the nearest moongate and step through. Coordinates for all moongates are in `worldmap.json`.
+- **Doors** (`+` on map): the pathfinder opens them automatically when stuck; or pass
+  through manually with `./ai/uo use <serial>` then `./ai/uo goto <x> <y>`
 
 ---
 
 ## Safety Rules
 
-1. **Check notoriety before attacking.** Killing an Innocent is a murder count — permanent.
-2. **War mode off by default.** Reset with `./ai/uo warmode off` after any combat.
-3. **Know your character's limits.** Read HP, armor, and skills before engaging anything.
+1. **Never attack without clear cause.** Attacking an Innocent gives a murder count.
+2. **Never attack other players.** Trammel is safe facet — no PvP.
+3. **War mode off by default.** Reset: `./ai/uo warmode off`.
 4. **When lost**: `./ai/uo summary` first. Read the map. Then decide.
 
 ---
 
-## Example Turn
+## Example Session
 
 ```bash
-# Start of session — discover who you are
+# Orient
+./ai/uo summary
 ./ai/uo player
-# → Read name, skills, stats. Decide how to play this character.
 
+# Run a macro from the library
+python3 ai/macros/buy_reagents.py
+
+# Check what happened
+./ai/uo journal 10
+
+# Write a one-off inline script
+python3 - <<'EOF'
+import asyncio, sys
+sys.path.insert(0, "ai")
+from lib.nav import smart_goto
+from lib.actions import emote
+
+async def main():
+    await emote("decides to explore the southern road")
+    await smart_goto(4395, 1160, timeout=90, run=True)
+
+asyncio.run(main())
+EOF
+
+# Verify position
 ./ai/uo summary
-# → Entity list: "Beau the herbalist  NPC  4t  NE  +4  -2  Invulnerable"
-
-./ai/uo walk ne 3
-./ai/uo summary
-# → Beau now at DX=+1, DY=+1.
-
-./ai/uo emote "approaches the herbalist"
-./ai/uo say "Good day. What do you sell."
-./ai/uo use 458732
-# → Journal: "[Beau] Welcome. What can I get for you?"
 ```
