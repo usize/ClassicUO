@@ -49,7 +49,8 @@ MOVE
   ./ai/uo move <dir> run     One running step
   ./ai/uo walk <dir> <N>     N steps with pacing (good for navigating several tiles)
   ./ai/uo goto <x> <y> [z]    Pathfind to world coordinates — A* routes around obstacles
-  ./ai/uo follow <serial>      Pathfind to a mobile or item (stops 1 tile away)
+  ./ai/uo follow <serial> [--persistent] [interval]
+                              Pathfind to mobile/item. Use --persistent for continuous follow
   ./ai/uo stopwalk             Cancel any in-progress pathfinding
 
 SPEAK
@@ -184,6 +185,47 @@ Coordinates: X increases East, Y increases South.
 
 ---
 
+## Persistent Commands & Background Execution
+
+For meaningful gameplay, some commands should run in the background so you can continue interacting:
+
+### **CRITICAL: Proper Background Execution**
+To run commands in the background **properly**, you **MUST** redirect output:
+```bash
+# WRONG - still outputs to terminal, blocks interaction
+./ai/uo follow 0x12345678 --persistent &
+
+# CORRECT - redirects output to /dev/null
+./ai/uo follow 0x12345678 --persistent > /dev/null 2>&1 &
+
+# For debugging (see output in file)
+./ai/uo follow 0x12345678 --persistent > follow.log 2>&1 &
+```
+
+### Persistent Following
+- `./ai/uo follow 0x12345678 --persistent` — Continuously follows a moving target
+- Default interval: 1 second between pathfinding updates
+- **Run in background (CORRECT)**:  
+  `./ai/uo follow 0x12345678 --persistent > /dev/null 2>&1 &`
+- **Stop following**: Use `./ai/uo stopwalk` to cancel pathfinding, then `pkill -f "uo follow"` to kill the background process
+
+### Combat & Wandering
+- `./ai/uo combat <target> --heal-threshold=50` — Fight with auto-healing
+- `./ai/uo wander <radius>` — Random walk within radius
+- **Always redirect**: `> /dev/null 2>&1 &`
+
+### Why Background Execution Matters
+- Allows you to chat, cast spells, or interact while moving
+- Makes following other players practical
+- Enables complex multi-step actions
+
+### Managing Background Processes
+- Check running processes: `ps aux | grep "uo"`
+- Kill specific process: `pkill -f "uo follow"`
+- View process output if redirected to file
+
+---
+
 ## Example Turn
 
 ```bash
@@ -202,4 +244,24 @@ Coordinates: X increases East, Y increases South.
 ./ai/uo say "Good day. What do you sell."
 ./ai/uo use 458732
 # → Journal: "[Beau] Welcome. What can I get for you?"
+```
+
+## Example: Following a Player
+
+```bash
+# Find a player to follow
+./ai/uo summary
+# → Entity list: "usize  human player  7t  SE  +5  +6  Gray"
+
+# Start persistent follow in background
+./ai/uo follow 0x00000001 --persistent &
+
+# Continue chatting while following
+./ai/uo say "Hello! I'll follow you for a bit."
+./ai/uo summary
+# → Check journal for responses, see position updates
+
+# When done following
+./ai/uo stopwalk
+pkill -f "uo follow"
 ```

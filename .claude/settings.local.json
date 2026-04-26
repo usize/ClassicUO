@@ -15,7 +15,8 @@
       "Bash(./ai/uo:*)",
       "Bash(curl:*)",
       "Skill(uo:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(printf:*)"
     ]
   }
 }
