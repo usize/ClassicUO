@@ -87,10 +87,48 @@ case "$cmd" in
         fi
         ;;
 
-    # follow <serial>  — pathfind to a mobile or item (stops 1 tile away)
+    # follow <serial> [--persistent] [interval] — pathfind to a mobile or item
+    #   --persistent, -p: continuously follow (default interval: 1 second)
     follow)
-        serial="$(_dec "${1:?Usage: uo follow <serial>}")"
-        _post "actions/pathfind" "{\"serial\":$serial}"
+        serial="$(_dec "${1:?Usage: uo follow <serial> [--persistent] [interval_seconds]}")"
+        shift
+        
+        persistent=false
+        interval=1
+        
+        # Parse optional arguments
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --persistent|-p)
+                    persistent=true
+                    shift
+                    ;;
+                *)
+                    # Check if it's a number (interval)
+                    if [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                        interval="$1"
+                        shift
+                    else
+                        echo "Error: Unknown argument: $1" >&2
+                        echo "Usage: uo follow <serial> [--persistent] [interval_seconds]" >&2
+                        exit 1
+                    fi
+                    ;;
+            esac
+        done
+        
+        if [[ "$persistent" == "true" ]]; then
+            echo "Following serial $serial persistently (checking every $interval seconds)"
+            echo "Press Ctrl+C to stop, or run 'uo stopwalk' in another terminal"
+            echo "Tip: Run with '&' to background: 'uo follow 0x123 --persistent &'"
+            trap 'echo -e "\nStopped following."; exit 0' INT
+            while true; do
+                _post "actions/pathfind" "{\"serial\":$serial}" >/dev/null 2>&1
+                sleep "$interval"
+            done
+        else
+            _post "actions/pathfind" "{\"serial\":$serial}"
+        fi
         ;;
 
     # stopwalk  — cancel any in-progress pathfinding
@@ -264,7 +302,8 @@ MOVE
   uo move <dir> [run]           One step. dir: north south east west ne se sw nw
   uo walk <dir> <n> [run]       n steps with pacing (~0.4s between steps)
   uo goto <x> <y> [z]          Pathfind to world coordinates (A* around obstacles)
-  uo follow <serial>            Pathfind to a mobile or item (stops 1 tile away)
+  uo follow <serial> [--persistent] [interval]
+                                Pathfind to mobile/item. Use -p for continuous follow
   uo stopwalk                   Cancel in-progress pathfinding
 
 SPEAK
