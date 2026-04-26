@@ -157,20 +157,30 @@ Use `./ai/uo paperdoll <serial>` to infer an NPC's trade from their equipment.
 
 ## Navigation
 
-**Pathfinding** is the primary way to move — it routes around obstacles automatically:
+**Pathfinding** (`goto`) is the **primary and preferred** way to move — it routes around obstacles automatically:
 - `./ai/uo goto 1234 5678` — walk to world coordinates (reads current Z from player)
+  - **Always prefer `goto` over manual `move`/`walk` commands**
+  - Automatically detects and opens doors when stuck
+  - Monitors position and gives clear success/failure feedback
+  - Times out after 30s if destination unreachable
 - `./ai/uo follow 0x12345678` — walk to a specific entity by serial (stops 1 tile away)
 - `./ai/uo stopwalk` — cancel pathfinding if you need to stop mid-route
 
-**Manual stepping** for fine adjustments only:
-- `./ai/uo move <dir>` — one step, useful when already adjacent to a target
-- `./ai/uo walk <dir> <n>` — n steps in one direction, no obstacle avoidance
+**Manual stepping** for **fine adjustments only** (when already adjacent to target):
+- `./ai/uo move <dir>` — one step
+- `./ai/uo walk <dir> <n>` — n steps in one direction (no obstacle avoidance)
 
-**Doors** (`+` on map): find the door's serial in the entity list and `./ai/uo use <serial>`.
-After opening, `./ai/uo follow <door-serial>` or `./ai/uo goto <x> <y>` to pass through.
+**Doors** (`+` on map):
+- Open with `./ai/uo use <door-serial>`
+- **Doors auto-close after ~5 seconds** — go through quickly!
+- Improved `goto` automatically opens stuck doors and retries
 
-**When stuck**: `./ai/uo stopwalk`, then `./ai/uo summary` to re-read the map. Look for
-`#` (wall) or `+` (door) blocking your path. Open doors, then pathfind again.
+**When stuck**: The new `goto` command will:
+1. Detect being stuck after 1 second
+2. Look for nearby doors
+3. Open them automatically
+4. Retry pathfinding once
+5. Report failure if still stuck
 
 Coordinates: X increases East, Y increases South.
 
@@ -182,6 +192,40 @@ Coordinates: X increases East, Y increases South.
 2. **War mode off by default.** Reset with `./ai/uo warmode off` after any combat.
 3. **Know your character's limits.** Read HP, armor, and skills before engaging anything.
 4. **When lost**: `./ai/uo summary` first. Read the map. Then decide.
+
+---
+
+## Key Learnings & Best Practices
+
+### **Navigation: Prefer `goto` over manual movement**
+- **Always use `./ai/uo goto <x> <y>`** instead of `move` or `walk` commands
+- `goto` uses A* pathfinding around obstacles
+- Automatically opens doors when stuck (new feature!)
+- Returns clear success/failure messages
+- Manual movement (`move`, `walk`) for fine adjustments only
+
+### **Combat & Healing Strategy**
+- **Bandages take ~12 seconds** to apply
+- Healing is less effective when hit during bandage application
+- **Flee at 40-50% HP** (not 20%) - gives safe margin
+- **Flee means MOVE AWAY**, not just turn off warmode
+- Safest strategy: Flee → heal in safety → re-engage
+
+### **Mounts & Race Limitations**
+- **Gargoyles cannot ride animal mounts** (llama, horse, etc.)
+- Can only ride gargoyle-specific mounts
+- Check character race before attempting to mount
+
+### **Door Management**
+- Doors auto-close after ~5 seconds
+- Use `follow` on doors or go through immediately after opening
+- Improved `goto` now detects and opens stuck doors automatically
+
+### **General Tips**
+- Equip weapons before combat (katana with Swordsmanship skill)
+- Use `pickup` → `equip` workflow for inventory management
+- Always check HP before engaging combat
+- Position matters: get in melee range before attacking
 
 ---
 
