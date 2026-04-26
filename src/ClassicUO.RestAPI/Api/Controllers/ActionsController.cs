@@ -265,6 +265,37 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
+        [HttpPost("pickup")]
+        public IActionResult PickUp([FromBody] PickUpRequest request)
+        {
+            var serial = request.Serial;
+            var amount = request.Amount;
+            Enqueue(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return;
+
+                GameActions.PickUp(world, serial, 0, 0, amount);
+            });
+
+            return Accepted();
+        }
+
+        [HttpPost("equip")]
+        public IActionResult Equip([FromBody] EquipRequest request)
+        {
+            var container = request.Container;
+            Enqueue(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return;
+
+                GameActions.Equip(world, container ?? 0);
+            });
+
+            return Accepted();
+        }
+
         /// <summary>Drop a currently held item into a container or on the ground.</summary>
         [HttpPost("drop")]
         public IActionResult Drop([FromBody] DropRequest request)

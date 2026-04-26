@@ -84,4 +84,18 @@ namespace ClassicUO.RestApi.Models
         /// <summary>Serial of a mobile or ground item to walk toward (stops 1 tile away).</summary>
         public uint? Serial { get; set; }
     }
+
+    public class PickUpRequest
+    {
+        /// <summary>Serial of the item to pick up (puts in cursor).</summary>
+        public uint Serial { get; set; }
+        /// <summary>Amount to pick up. Defaults to all.</summary>
+        public int Amount { get; set; } = -1;
+    }
+
+    public class EquipRequest
+    {
+        /// <summary>Container serial to equip to (defaults to player).</summary>
+        public uint? Container { get; set; }
+    }
 }
