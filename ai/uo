@@ -80,11 +80,134 @@ case "$cmd" in
         x="${1:?Usage: uo goto <x> <y> [z]}"
         y="${2:?Usage: uo goto <x> <y> [z]}"
         z="${3:-}"
+        
+        echo "Pathfinding to ($x, $y${z:+, $z})..."
+        
+        # Get current position
+        get_position() {
+            player_json=$(_get "player")
+            echo "$player_json" | jq -r '[.x, .y, .z] | @tsv'
+        }
+        
+        # Function to find nearest door
+        find_nearest_door() {
+            summary_text=$(_get "summary")
+            # Extract doors from summary (lines starting with + followed by serial)
+            echo "$summary_text" | grep "^  +" | grep -i "door" | head -1 | awk '{print $2}' | sed 's/0x//'
+        }
+        
+        # Function to open a door by serial
+        open_door() {
+            door_serial="$1"
+            if [[ -n "$door_serial" ]]; then
+                echo "  Trying to open door $door_serial..."
+                _post "actions/use" "{\"serial\":$(_dec "0x$door_serial")}" >/dev/null 2>&1
+                sleep 0.5  # Wait for door to open
+                return 0
+            fi
+            return 1
+        }
+        
+        # Get initial position
+        read start_x start_y start_z <<< "$(get_position)"
+        
+        # Send pathfind request
         if [[ -n "$z" ]]; then
-            _post "actions/pathfind" "{\"x\":$x,\"y\":$y,\"z\":$z}"
+            _post "actions/pathfind" "{\"x\":$x,\"y\":$y,\"z\":$z}" >/dev/null 2>&1
         else
-            _post "actions/pathfind" "{\"x\":$x,\"y\":$y}"
+            _post "actions/pathfind" "{\"x\":$x,\"y\":$y}" >/dev/null 2>&1
         fi
+        
+        # Monitoring variables
+        check_interval=0.5  # seconds between position checks
+        stuck_timeout=1.0   # seconds without movement = stuck
+        max_timeout=30      # maximum total time
+        retry_attempted=false  # Have we tried opening doors yet?
+        stuck_start_time=""
+        start_time=$(date +%s.%N)
+        last_x=$start_x
+        last_y=$start_y
+        last_z=$start_z
+        
+        while true; do
+            # Check total timeout
+            current_time=$(date +%s.%N)
+            elapsed=$(echo "$current_time - $start_time" | bc)
+            if (( $(echo "$elapsed > $max_timeout" | bc -l) )); then
+                echo "Pathfinding timed out after ${max_timeout}s" >&2
+                exit 1
+            fi
+            
+            # Get current position
+            read curr_x curr_y curr_z <<< "$(get_position)"
+            
+            # Calculate distance to destination
+            dx=$(echo "$curr_x - $x" | bc)
+            dy=$(echo "$curr_y - $y" | bc)
+            if [[ -n "$z" ]]; then
+                dz=$(echo "$curr_z - $z" | bc)
+            else
+                dz=0
+            fi
+            distance=$(echo "sqrt($dx^2 + $dy^2 + $dz^2)" | bc)
+            
+            # Check if reached destination (within 1 tile)
+            if (( $(echo "$distance <= 1.0" | bc -l) )); then
+                echo "✓ Reached destination ($curr_x, $curr_y, $curr_z) - distance: ${distance%.*} tiles"
+                exit 0
+            fi
+            
+            # Check if moving
+            moved_x=$(echo "$curr_x != $last_x" | bc)
+            moved_y=$(echo "$curr_y != $last_y" | bc)
+            moved_z=$(echo "$curr_z != $last_z" | bc)
+            
+            if [[ $moved_x -eq 1 || $moved_y -eq 1 || $moved_z -eq 1 ]]; then
+                # Moving - reset stuck timer and retry flag
+                stuck_start_time=""
+                retry_attempted=false
+                last_x=$curr_x
+                last_y=$curr_y
+                last_z=$curr_z
+            else
+                # Not moving - check if stuck
+                if [[ -z "$stuck_start_time" ]]; then
+                    stuck_start_time=$current_time
+                else
+                    stuck_elapsed=$(echo "$current_time - $stuck_start_time" | bc)
+                    if (( $(echo "$stuck_elapsed > $stuck_timeout" | bc -l) )); then
+                        # We're stuck! Try to open doors if we haven't already
+                        if [[ "$retry_attempted" == "false" ]]; then
+                            echo "Stuck at ($curr_x, $curr_y, $curr_z) - looking for doors..."
+                            door_serial=$(find_nearest_door)
+                            if open_door "$door_serial"; then
+                                echo "  Door opened, retrying pathfinding..."
+                                # Retry pathfinding
+                                if [[ -n "$z" ]]; then
+                                    _post "actions/pathfind" "{\"x\":$x,\"y\":$y,\"z\":$z}" >/dev/null 2>&1
+                                else
+                                    _post "actions/pathfind" "{\"x\":$x,\"y\":$y}" >/dev/null 2>&1
+                                fi
+                                retry_attempted=true
+                                stuck_start_time=""  # Reset stuck timer
+                                sleep 1  # Wait for pathfinding to restart
+                                continue  # Skip to next iteration
+                            else
+                                echo "  No doors found nearby or failed to open"
+                            fi
+                        fi
+                        
+                        # If we already tried doors or no doors found, fail
+                        echo "✗ Pathfinding stuck at ($curr_x, $curr_y, $curr_z)" >&2
+                        echo "  Destination ($x, $y${z:+, $z}) is ${distance%.*} tiles away" >&2
+                        echo "  Possible obstacles: walls, closed doors, impassable terrain" >&2
+                        exit 1
+                    fi
+                fi
+            fi
+            
+            sleep "$check_interval"
+        done
         ;;
 
     # follow <serial> [--persistent] [interval] — pathfind to a mobile or item
@@ -213,6 +336,164 @@ case "$cmd" in
         _post "actions/grab" "{\"serial\":$serial,\"amount\":$amount}"
         ;;
 
+    # pickup <serial> [amount] — pick up item (puts in cursor for equipping)
+    pickup)
+        serial="$(_dec "${1:?Usage: uo pickup <serial> [amount]}")"
+        amount="${2:--1}"
+        _post "actions/pickup" "{\"serial\":$serial,\"amount\":$amount}"
+        ;;
+
+    # equip [container] — equip item currently held in cursor
+    equip)
+        container="${1:-}"
+        if [[ -n "$container" ]]; then
+            container="$(_dec "$container")"
+            _post "actions/equip" "{\"container\":$container}"
+        else
+            _post "actions/equip" "{}"
+        fi
+        ;;
+
+    # wander [radius] [center_x] [center_y] — random walk within radius
+    wander)
+        radius="${1:-5}"
+        center_x="${2:-}"
+        center_y="${3:-}"
+        
+        # Get current position if center not specified
+        if [[ -z "$center_x" || -z "$center_y" ]]; then
+            player_json=$(_get "player")
+            center_x=$(echo "$player_json" | jq '.x')
+            center_y=$(echo "$player_json" | jq '.y')
+        fi
+        
+        echo "Wandering within radius $radius of ($center_x, $center_y)"
+        echo "Press Ctrl+C to stop, or run 'uo stopwalk'"
+        echo "Run with '&' to background: 'uo wander 5 &'"
+        
+        trap 'echo -e "\nStopped wandering."; exit 0' INT
+        
+        while true; do
+            # Generate random offset within radius
+            offset_x=$((RANDOM % (2*radius + 1) - radius))
+            offset_y=$((RANDOM % (2*radius + 1) - radius))
+            target_x=$((center_x + offset_x))
+            target_y=$((center_y + offset_y))
+            
+            echo "Walking to ($target_x, $target_y)"
+            _post "actions/pathfind" "{\"x\":$target_x,\"y\":$target_y}" >/dev/null 2>&1
+            
+            # Wait to reach destination or random time
+            sleep $((3 + RANDOM % 5))
+            
+            # Check for gumps periodically (for resurrection)
+            gumps=$(_get "gumps")
+            if [[ "$gumps" != "[]" ]]; then
+                echo "Gump detected! Check with 'uo gumps'"
+                # Could auto-respond to resurrection gump here
+            fi
+        done
+        ;;
+
+    # combat <target_serial> [options] — fight with auto-healing/fleeing
+    #   --heal-threshold=<percent>  (default: 50)
+    #   --flee-threshold=<percent>  (default: 20)
+    #   --check-interval=<seconds>  (default: 1)
+    combat)
+        target="$(_dec "${1:?Usage: uo combat <target_serial> [--heal-threshold=50] [--flee-threshold=20] [--check-interval=1]}")"
+        shift
+        
+        heal_threshold=50
+        flee_threshold=40
+        check_interval=1
+        
+        # Parse options
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --heal-threshold=*)
+                    heal_threshold="${1#*=}"
+                    shift
+                    ;;
+                --flee-threshold=*)
+                    flee_threshold="${1#*=}"
+                    shift
+                    ;;
+                --check-interval=*)
+                    check_interval="${1#*=}"
+                    shift
+                    ;;
+                *)
+                    echo "Error: Unknown option: $1" >&2
+                    echo "Usage: uo combat <target> [--heal-threshold=50] [--flee-threshold=20] [--check-interval=1]" >&2
+                    exit 1
+                    ;;
+            esac
+        done
+        
+        echo "Starting combat with target $target"
+        echo "Heal below ${heal_threshold}% HP, flee below ${flee_threshold}% HP"
+        echo "Checking every ${check_interval} seconds"
+        echo "Run with '&' to background: 'uo combat 0x123 --heal-threshold=50 &'"
+        echo "Press Ctrl+C to stop, or run 'uo stopwalk' and 'uo warmode off'"
+        
+        # Enter warmode first
+        _post "actions/warmode" "{\"enabled\":true}"
+        sleep 0.5
+        
+        # Start attacking
+        _post "actions/attack" "{\"serial\":$target}"
+        
+        trap 'echo -e "\nStopping combat."; _post "actions/warmode" "{\"enabled\":false}"; exit 0' INT
+        
+        # Find a bandage in backpack
+        find_bandage() {
+            backpack_json=$(_get "containers/backpack")
+            # Look for item with graphic 3617 (bandage) or name containing "bandage"
+            echo "$backpack_json" | jq -r '.items[] | select(.graphic == 3617 or (.name | ascii_downcase | contains("bandage"))) | .serial' | head -1
+        }
+        
+        bandage_serial=$(find_bandage)
+        if [[ -n "$bandage_serial" ]]; then
+            echo "Found bandage: $bandage_serial"
+        else
+            echo "No bandages found in backpack"
+        fi
+        
+        while true; do
+            # Get player stats to check HP
+            player_json=$(_get "player")
+            hp_current=$(echo "$player_json" | jq '.stats.hits')
+            hp_max=$(echo "$player_json" | jq '.stats.hitsMax')
+            hp_percent=$(( (hp_current * 100) / hp_max ))
+            
+            if [[ $hp_percent -lt $flee_threshold ]]; then
+                echo "HP at ${hp_percent}% - FLEEING!"
+                _post "actions/warmode" "{\"enabled\":false}"
+                _post "actions/stopwalk" "{}"
+                echo "Combat stopped due to low HP"
+                exit 0
+            elif [[ $hp_percent -lt $heal_threshold && -n "$bandage_serial" ]]; then
+                echo "HP at ${hp_percent}% - Using bandage $bandage_serial"
+                # Use bandage (opens targeting cursor)
+                _post "actions/use" "{\"serial\":$bandage_serial}"
+                sleep 0.5
+                # Target self (player serial is 0x00007AEB = 31467)
+                _post "actions/target" "{\"serial\":31467}"
+                sleep 12  # Bandage takes ~12 seconds to apply
+                # Find another bandage if this one was used up
+                bandage_serial=$(find_bandage)
+                if [[ -z "$bandage_serial" ]]; then
+                    echo "Out of bandages"
+                fi
+            fi
+            
+            # Re-attack if needed (in case target changes or combat stops)
+            _post "actions/attack" "{\"serial\":$target}" >/dev/null 2>&1
+            
+            sleep "$check_interval"
+        done
+        ;;
+
     # drop <serial> [container_serial] — drop held item into container or ground
     drop)
         serial="$(_dec "${1:?Usage: uo drop <serial> [container_serial]}")"
@@ -319,12 +600,15 @@ INTERACT
   uo target <x> <y> <z>         Target ground coordinates
   uo target cancel              Cancel targeting cursor
   uo attack <serial>            Attack a mobile (enter war mode first)
+  uo combat <serial> [options]  Fight with auto-flee at low HP
   uo warmode [on|off]           Toggle war/peace mode
 
 CONTAINERS & INVENTORY
   uo backpack                   View your backpack contents (JSON)
   uo container <serial>         View contents of any container (JSON)
   uo grab <serial> [amount]     Pick up item and put in backpack
+  uo pickup <serial> [amount]   Pick up item (puts in cursor for equipping)
+  uo equip [container]          Equip item currently held in cursor
   uo drop <serial> [container]  Drop item into container or on ground
 
 GUMPS (NPC dialogs, menus)
