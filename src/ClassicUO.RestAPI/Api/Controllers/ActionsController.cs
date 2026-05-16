@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ClassicUO;
 using ClassicUO.Game;
 using ClassicUO.Game.Data;
@@ -296,7 +297,7 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
-        /// <summary>Drop a currently held item into a container or on the ground.</summary>
+        /// <summary>Drop an item into a container or on the ground. If the item is not currently held, it will be picked up first.</summary>
         [HttpPost("drop")]
         public IActionResult Drop([FromBody] DropRequest request)
         {
@@ -305,8 +306,40 @@ namespace ClassicUO.RestApi.Controllers
                 var world = GetWorld();
                 if (world?.Player == null) return;
 
+                var held = Client.Game.UO.GameCursor.ItemHold;
+                if (!held.Enabled || held.Serial != request.Serial)
+                {
+                    if (!world.Items.TryGetValue(request.Serial, out var item) || item == null || item.IsDestroyed)
+                    {
+                        Log.Warn($"Drop failed: item 0x{request.Serial:X8} not found");
+                        return;
+                    }
+                    if (item.OnGround && item.Distance > Constants.DRAG_ITEMS_DISTANCE)
+                    {
+                        Log.Warn($"Drop failed: item 0x{request.Serial:X8} is {item.Distance} tiles away (max {Constants.DRAG_ITEMS_DISTANCE})");
+                        return;
+                    }
+                    if (!GameActions.PickUp(world, request.Serial, 0, 0, -1))
+                    {
+                        Log.Warn($"Drop failed: could not pick up item 0x{request.Serial:X8}");
+                        return;
+                    }
+                }
+
                 var container = request.Container ?? 0xFFFF_FFFF;
-                GameActions.DropItem(request.Serial, request.X, request.Y, request.Z, container);
+                ushort x = request.X;
+                ushort y = request.Y;
+                sbyte z = request.Z;
+
+                // For ground drops, 0xFFFF means "not specified" — drop at player's feet
+                if (container == 0xFFFF_FFFF && (x == 0xFFFF || y == 0xFFFF))
+                {
+                    x = world.Player.X;
+                    y = world.Player.Y;
+                    z = world.Player.Z;
+                }
+
+                GameActions.DropItem(request.Serial, x, y, z, container);
             });
 
             return Accepted();
