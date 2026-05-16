@@ -494,14 +494,67 @@ case "$cmd" in
         done
         ;;
 
-    # drop <serial> [container_serial] — drop held item into container or ground
+    # drop <serial> [container_serial] — drop item on ground or into a container.
+    # If the item is not currently held, it will be picked up automatically.
+    # Ground items more than 3 tiles away will trigger pathfinding first.
     drop)
         serial="$(_dec "${1:?Usage: uo drop <serial> [container_serial]}")"
         container="${2:-}"
+
+        # For ground items, move within range if too far
+        item_json=$(_get "world/items/$serial")
+        if [[ "$item_json" != "null" && -n "$item_json" ]]; then
+            dist=$(echo "$item_json" | jq '.distance // 0')
+            if [[ "$dist" -gt 3 ]]; then
+                ix=$(echo "$item_json" | jq -r '.x')
+                iy=$(echo "$item_json" | jq -r '.y')
+                iz=$(echo "$item_json" | jq -r '.z')
+                echo "Item is $dist tiles away. Moving closer..."
+                bash "$0" goto "$ix" "$iy" "$iz" || { echo "Failed to reach item." >&2; exit 1; }
+            fi
+        fi
+
         if [[ -n "$container" ]]; then
             _post "actions/drop" "{\"serial\":$serial,\"container\":$(_dec "$container")}"
         else
             _post "actions/drop" "{\"serial\":$serial}"
+        fi
+        ;;
+
+    # place <serial> [container_serial | x y z] — pick up and place an item.
+    # If no destination is given, drops on the ground near the player.
+    # Ground items more than 3 tiles away will trigger pathfinding first.
+    place)
+        serial="$(_dec "${1:?Usage: uo place <serial> [container_serial | x y z]}")"
+        shift
+
+        # For ground items, move within range if too far
+        item_json=$(_get "world/items/$serial")
+        if [[ "$item_json" != "null" && -n "$item_json" ]]; then
+            dist=$(echo "$item_json" | jq '.distance // 0')
+            if [[ "$dist" -gt 3 ]]; then
+                ix=$(echo "$item_json" | jq -r '.x')
+                iy=$(echo "$item_json" | jq -r '.y')
+                iz=$(echo "$item_json" | jq -r '.z')
+                echo "Item is $dist tiles away. Moving closer..."
+                bash "$0" goto "$ix" "$iy" "$iz" || { echo "Failed to reach item." >&2; exit 1; }
+            fi
+        fi
+
+        if [[ $# -eq 0 ]]; then
+            # Drop on ground near player
+            _post "actions/drop" "{\"serial\":$serial}"
+        elif [[ $# -eq 1 ]]; then
+            container="$(_dec "$1")"
+            _post "actions/drop" "{\"serial\":$serial,\"container\":$container}"
+        elif [[ $# -eq 2 || $# -eq 3 ]]; then
+            x="$1"
+            y="$2"
+            z="${3:-0}"
+            _post "actions/drop" "{\"serial\":$serial,\"x\":$x,\"y\":$y,\"z\":$z}"
+        else
+            echo "Usage: uo place <serial> [container_serial | x y z]" >&2
+            exit 1
         fi
         ;;
 
@@ -512,11 +565,27 @@ case "$cmd" in
         _get "gumps"
         ;;
 
-    # gump-respond <localSerial> <buttonID>  — click a button on a gump
+    # gump-respond <localSerial> <buttonID> [switches...]  — respond to a gump (button + optional checkbox selections)
     gump-respond|gr)
-        serial="$(_dec "${1:?Usage: uo gump-respond <localSerial> <buttonID>}")"
-        button="${2:?Usage: uo gump-respond <localSerial> <buttonID>}"
-        _post "gumps/$serial/respond" "{\"buttonID\":$button}"
+        serial="$(_dec "${1:?Usage: uo gump-respond <localSerial> <buttonID> [switches]}")"
+        button="${2:?Usage: uo gump-respond <localSerial> <buttonID> [switches]}"
+        switches="${3:-}"
+        if [ -n "$switches" ]; then
+            IFS=',' read -ra switch_arr <<< "$switches"
+            switch_list="["
+            first=true
+            for s in "${switch_arr[@]}"; do
+                s_trimmed="$(echo -n "$s" | tr -d '[:space:]')"
+                [ "$first" = false ] && switch_list+=", "
+                switch_list+="$s_trimmed"
+                first=false
+            done
+            switch_list+="]"
+            body="{\"buttonID\":$button,\"switches\":$switch_list,\"textEntries\":[]}"
+        else
+            body="{\"buttonID\":$button,\"switches\":[],\"textEntries\":[]}"
+        fi
+        _post "gumps/$serial/respond" "$body"
         ;;
 
     # gump-close <localSerial>  — close/cancel a gump
@@ -609,11 +678,12 @@ CONTAINERS & INVENTORY
   uo grab <serial> [amount]     Pick up item and put in backpack
   uo pickup <serial> [amount]   Pick up item (puts in cursor for equipping)
   uo equip [container]          Equip item currently held in cursor
-  uo drop <serial> [container]  Drop item into container or on ground
+  uo drop <serial> [container]  Drop item into container or on ground (auto-pickup, auto-goto)
+  uo place <serial> [dest]      Place item on ground, at coordinates, or into container
 
 GUMPS (NPC dialogs, menus)
   uo gumps                      List all open server gumps (JSON)
-  uo gump-respond <id> <btn>    Click button on a gump (respond to NPC dialog)
+  uo gump-respond <id> <btn> [switches]  Respond to a gump (button + optional comma-sep checkbox serials)
   uo gump-close <id>            Close/cancel a gump
 
 SHOP / VENDOR
