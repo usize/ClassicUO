@@ -156,5 +156,12 @@ class Telemetry:
         )
         print(line, file=sys.stderr)
         if self.capture_content:
-            print(f"  prompt: {t['screen'][:300].replace(chr(10), ' ')}", file=sys.stderr)
-            print(f"  reply:  {t['reply'][:300].replace(chr(10), ' ')}", file=sys.stderr)
+            # Full screen, newlines intact — a truncated/flattened preview would cut
+            # off before NOW (the ASCII map + entity list) and mangle it if it didn't.
+            print("  ┌─ prompt (what the agent saw) " + "─" * 40, file=sys.stderr)
+            for ln in t["screen"].splitlines():
+                print(f"  │ {ln}", file=sys.stderr)
+            print("  ├─ reply " + "─" * 63, file=sys.stderr)
+            for ln in t["reply"].splitlines():
+                print(f"  │ {ln}", file=sys.stderr)
+            print("  └" + "─" * 71, file=sys.stderr)
