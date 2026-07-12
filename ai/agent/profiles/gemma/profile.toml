@@ -1,0 +1,28 @@
+[api]
+base = "http://127.0.0.1:9000"
+
+[llm]
+provider = "llamacpp"          # "anthropic" | "openai" (openai-compatible: DeepSeek, Ollama, OpenRouter…)
+model = "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
+#api_key_env = "ANTHROPIC_API_KEY"
+base_url = "http://127.0.0.1:8001/v1"   # example for provider = "openai"
+max_tokens = 32000
+temperature = 0.7
+
+[pacing]
+min_wait = 2.0
+max_wait = 120.0
+default_wait = 20.0
+wake_on_speech = true
+
+[budget]                        # tokens per screen section (chars/4 estimate)
+goals = 300
+notes = 600
+todo = 200
+memory_index = 300
+recalled = 800
+history = 600
+now = 2200
+chat = 1500
+events = 500
+last_turn = 600
