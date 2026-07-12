@@ -106,6 +106,31 @@ def parse(reply: str) -> list[Command]:
 
 # ── DO dispatch ──────────────────────────────────────────────────────────────
 
+def _wait_for_target_cursor(api: RestApi, timeout: float = 4.0, interval: float = 0.3) -> str:
+    """Poll /api/player for isTargeting (only present on rebuilt servers — see
+    PlayerDto.IsTargeting). A spell doesn't open its cursor until the server finishes
+    processing the cast, which can take longer than one turn's DO spacing; sending
+    target before the cursor is open is a silent no-op. Returns:
+      "yes"     — cursor confirmed open, safe to send target now
+      "no"      — server has the field but it never went true (cast likely failed)
+      "unknown" — server build predates this field; caller should fall back to retries
+    """
+    deadline = time.time() + timeout
+    saw_field = False
+    while time.time() < deadline:
+        player = api.get_json("player")
+        if player is None:
+            time.sleep(interval)
+            continue
+        if "isTargeting" not in player:
+            return "unknown"
+        saw_field = True
+        if player["isTargeting"]:
+            return "yes"
+        time.sleep(interval)
+    return "no" if saw_field else "unknown"
+
+
 def _do(api: RestApi, arg: str) -> str:
     """Execute one DO command; return a short result line."""
     parts = arg.split()
@@ -147,9 +172,25 @@ def _do(api: RestApi, arg: str) -> str:
         if cmd == "target" and args:
             if args[0].lower() == "cancel":
                 return post("actions/target", {"cancel": True})
-            if len(args) >= 3:
-                return post("actions/target", {"x": int(args[0]), "y": int(args[1]), "z": int(args[2])})
-            return post("actions/target", {"serial": to_serial(args[0])})
+            body = (
+                {"x": int(args[0]), "y": int(args[1]), "z": int(args[2])}
+                if len(args) >= 3 else {"serial": to_serial(args[0])}
+            )
+            cursor = _wait_for_target_cursor(api)
+            if cursor == "no":
+                return ("ERROR target: no target cursor opened after 4s — the cast likely "
+                        "failed (missing reagents/mana, spell not known, or nothing was cast)")
+            if cursor == "unknown":
+                # server build predates isTargeting (see PlayerDto) — resend blind;
+                # Target() is a safe no-op if the cursor isn't open yet.
+                last, ok = "", False
+                for i in range(6):
+                    ok, text = api.post("actions/target", body)
+                    last = text.strip()[:200]
+                    if i < 5:
+                        time.sleep(0.35)
+                return f"{'ok' if ok else 'ERROR'} target: {last or 'done'} (blind retry — rebuild server for cursor confirmation)"
+            return post("actions/target", body)
         if cmd == "opendoor":
             return post("actions/opendoor", {})
         if cmd == "grab" and args:
@@ -173,7 +214,7 @@ def _do(api: RestApi, arg: str) -> str:
         if cmd in ("cast", "spell") and args:
             r = post("actions/spell", {"index": int(args[0])})
             if not r.startswith("ERROR"):
-                r += " — spells do NOTHING until targeted: follow with 'DO: target <serial>' (yourself for beneficial spells)"
+                r += " — now DO: target <serial> (yourself for beneficial spells); the engine waits for the target cursor"
             return r
         if cmd == "backpack":
             return query("containers/backpack")

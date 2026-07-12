@@ -51,7 +51,9 @@ namespace ClassicUO.RestApi.Controllers
             var war    = p.InWarMode ? "  [WAR]"  : "";
             var dead   = p.IsDead    ? "  [DEAD]" : "";
 
-            sb.AppendLine($"  {p.Name}  (0x{p.Serial:X8})  {map}  ({p.X}, {p.Y}, {p.Z})  facing {facing}{war}{dead}");
+            var targeting = p.IsTargeting ? $"  [TARGET CURSOR ACTIVE — {p.TargetingType}, click now: ./ai/uo target <serial>]" : "";
+
+            sb.AppendLine($"  {p.Name}  (0x{p.Serial:X8})  {map}  ({p.X}, {p.Y}, {p.Z})  facing {facing}{war}{dead}{targeting}");
             sb.AppendLine($"  HP {st.Hits}/{st.HitsMax}  MP {st.Mana}/{st.ManaMax}  Stam {st.Stamina}/{st.StaminaMax}  Gold {st.Gold:N0}  Wt {st.Weight}/{st.WeightMax}");
             if (st.Followers > 0)
                 sb.AppendLine($"  Pets: {st.Followers}/{st.FollowersMax}");

@@ -213,7 +213,7 @@ namespace ClassicUO.RestApi
             }
 
             var timestamp = DateTimeOffset.UtcNow;
-            var player = world.Player != null ? new PlayerDto(world.Player, world.MapIndex, world.ServerName) : null;
+            var player = world.Player != null ? new PlayerDto(world.Player, world.MapIndex, world.ServerName, world.TargetManager) : null;
             var mobiles = BuildMobiles(world);
             var items = BuildGroundItems(world);
             var journal = BuildJournalEntries(world.Journal);

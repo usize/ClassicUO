@@ -2,12 +2,13 @@ using System.Collections.Generic;
 using ClassicUO.Game;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
+using ClassicUO.Game.Managers;
 
 namespace ClassicUO.RestApi.Models
 {
     internal sealed class PlayerDto
     {
-        public PlayerDto(PlayerMobile player, int mapIndex, string serverName)
+        public PlayerDto(PlayerMobile player, int mapIndex, string serverName, TargetManager targetManager = null)
         {
             Serial = player.Serial;
             Name = player.Name ?? string.Empty;
@@ -23,6 +24,8 @@ namespace ClassicUO.RestApi.Models
             Equipment = BuildEquipment(player);
             Backpack = BuildBackpack(player);
             Skills = BuildSkills(player);
+            IsTargeting = targetManager?.IsTargeting ?? false;
+            TargetingType = targetManager?.TargetingType.ToString() ?? "None";
         }
 
         public uint Serial { get; }
@@ -39,6 +42,8 @@ namespace ClassicUO.RestApi.Models
         public IReadOnlyList<ItemDto> Equipment { get; }
         public ItemDto? Backpack { get; }
         public IReadOnlyList<SkillDto> Skills { get; }
+        public bool IsTargeting { get; }
+        public string TargetingType { get; }
 
         private static IReadOnlyList<ItemDto> BuildEquipment(PlayerMobile player)
         {

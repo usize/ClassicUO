@@ -19,9 +19,12 @@ company_window = 180.0           # seconds since another's speech = "in conversa
 wake_on_speech = true
 
 [telemetry]
-otlp_endpoint = "http://127.0.0.1:4318"   # OTLP/HTTP collector; "" disables
-capture_content = true                     # include full prompt/completion in spans
-# service_name = "uoagent-gemma"           # defaults to uoagent-<profile dir>
+otlp_endpoint = "stdout"          # "stdout" prints spans to stderr, no server needed;
+                                   # or a real OTLP/HTTP collector e.g. "http://127.0.0.1:4318";
+                                   # "" disables. NOTE: `nc` is NOT a valid collector — it
+                                   # doesn't speak HTTP, so exports will always fail against it.
+capture_content = true            # include full prompt/completion in spans
+# service_name = "uoagent-gemma"  # defaults to uoagent-<profile dir>
 
 [budget]                        # tokens per screen section (chars/4 estimate)
 goals = 300

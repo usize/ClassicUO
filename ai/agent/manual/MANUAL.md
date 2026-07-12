@@ -72,14 +72,17 @@ Skills grow by use; a gain can take 10–50 repetitions — this is normal, keep
 Useful skill indexes: 25=Magery 46=Meditation 17=Healing 16=Eval Int 0=Alchemy 23=Inscription.
 
 **Casting is two steps.** A spell opens a targeting cursor and does NOTHING until you
-target. Cast and target in the same turn — your own serial is on the player line in NOW:
+target it — the engine waits for that cursor to actually open before sending your
+target, so it is safe to issue both in the same turn:
 ```
 DO: cast 6
 DO: target 0x00007AEB
 ```
 Target yourself for beneficial spells (Heal, Night Sight), an enemy for attack spells.
-If EVENTS shows no spell effect after a cast, the cursor is still waiting: target
-something or `DO: target cancel`.
+If the player line in NOW shows `[TARGET CURSOR ACTIVE]`, a target is still pending from
+a previous turn — resolve it (`DO: target <serial>` or `DO: target cancel`) before doing
+anything else. If `DO: target` comes back `ERROR ... no target cursor opened`, the cast
+itself failed — check you have the reagents, mana, and skill for that spell.
 
 Spells cost mana and reagents (Night Sight costs mana only — ideal free Magery practice):
 - 4 Heal (garlic, ginseng, spider silk)

@@ -290,9 +290,14 @@ Span layout per turn, following the OpenTelemetry GenAI semantic conventions:
   usage block); span events `gen_ai.content.prompt` (full system + rendered screen —
   exactly what the agent sees) and `gen_ai.content.completion` (the raw reply).
 
-Config: `[telemetry] otlp_endpoint` ("" disables), `capture_content` (set false to keep
-prompts out of the collector), `service_name` (default `uoagent-<profile>`), so each
-character shows up as its own service in the trace UI.
+Config: `[telemetry] otlp_endpoint` ("" disables; `"stdout"` pretty-prints each turn to
+stderr with zero network dependency — the fastest way to watch what the model sees),
+`capture_content` (set false to keep prompts out of the collector), `service_name`
+(default `uoagent-<profile>`), so each character shows up as its own service in the
+trace UI. **`nc` is not a substitute collector** — it speaks raw TCP, not HTTP, so it can
+never send back the response `urlopen` waits for; every export against it reads as a
+connection failure. Use `otlp_endpoint = "stdout"` for dependency-free local viewing, or
+a real collector (Jaeger, Tempo, Phoenix, Langfuse) if you want the trace UI.
 
 ## 7. Profiles — one directory per character
 

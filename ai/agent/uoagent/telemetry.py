@@ -6,12 +6,19 @@ Phoenix, Langfuse all accept this). Each turn emits one `uoagent.turn` span
 with a `chat <model>` child span carrying gen_ai.* attributes; the full
 rendered screen (what the agent sees) and the completion ride along as span
 events. Export is fire-and-forget on a daemon thread — it never blocks a turn.
+
+`otlp_endpoint = "stdout"` skips the network entirely and pretty-prints each
+turn's spans to stdout instead — use this for local inspection. A bare `nc`
+listener will NOT work as a collector: nc speaks raw TCP, not HTTP, so it
+never sends back a response and every export will read as a connection
+failure (or hang until timeout).
 """
 
 from __future__ import annotations
 
 import json
 import secrets
+import sys
 import threading
 import urllib.request
 
@@ -117,6 +124,11 @@ class Telemetry:
                 }
             ]
         }
+
+        if self.endpoint == "stdout":
+            self._print(t, usage)
+            return
+
         try:
             req = urllib.request.Request(
                 f"{self.endpoint}/v1/traces",
@@ -127,5 +139,22 @@ class Telemetry:
             urllib.request.urlopen(req, timeout=5).close()
         except OSError as e:
             if not self._warned:
-                print(f"[telemetry] export failed ({e}) — will keep trying quietly")
+                print(f"[telemetry] export to {self.endpoint} failed ({e}). "
+                      f"If you pointed this at `nc`, that won't work — nc doesn't speak "
+                      f"HTTP, so it can never acknowledge the POST. Use otlp_endpoint = "
+                      f"\"stdout\" for a dependency-free local view, or point at a real "
+                      f"OTLP collector (Jaeger: `docker run -p 4318:4318 -p 16686:16686 "
+                      f"jaegertracing/all-in-one`).")
                 self._warned = True
+
+    def _print(self, t: dict, usage: dict) -> None:
+        dur_ms = (t["llm_end"] - t["llm_start"]) * 1000
+        line = (
+            f"[otel] turn={t.get('turn_number')} model={t['provider']}/{t['model']} "
+            f"latency={dur_ms:.0f}ms in={usage.get('input_tokens', 0)}tok "
+            f"out={usage.get('output_tokens', 0)}tok wait={t.get('wait', 0):.0f}s"
+        )
+        print(line, file=sys.stderr)
+        if self.capture_content:
+            print(f"  prompt: {t['screen'][:300].replace(chr(10), ' ')}", file=sys.stderr)
+            print(f"  reply:  {t['reply'][:300].replace(chr(10), ' ')}", file=sys.stderr)
