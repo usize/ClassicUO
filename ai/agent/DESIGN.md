@@ -40,6 +40,10 @@ each frame is to look at the screen and press keys.
             OpenAI-compat automatic prefix cache)
 
 [user]    THE SCREEN — rendered fresh each turn, fixed budget:
+          == TIME / COMPANY ==   computed presence line: current clock + either
+                                 "<name> spoke Ns ago — you are in conversation" or
+                                 "you are ALONE — pursue your GOALS". Small models
+                                 cannot infer this from timestamps; say it outright.
           == GOALS ==            profile GOALS.md (short, standing directives)
           == NOTES ==            agent-maintained pinned notes (numbered)
           == TODO ==             agent-maintained todo list (numbered)
@@ -206,7 +210,25 @@ tokens; diffs carry more signal for fewer tokens). A snapshot record keeps: time
 **CHAT** — journal entries that are *speech*: `name` ≠ "System" and `messageType` in
 {Regular, Yell, Whisper, Emote} (tune against live data; entries carry `textType` of
 SYSTEM/OBJECT/CLIENT…). Ring of ~200 entries, rendered newest-last, full text,
-`HH:MM:SS [Name] text`. Own lines included (agent must see what it said).
+`HH:MM:SS [Name] text`. Own lines included but marked `[Name (you)]` — without the
+marker, small models answer their own greetings in an endless loop (observed with
+gpt-5.4-nano). The section header spells it out: "'(you)' marks YOUR OWN past words —
+never answer them."
+
+**Presence & pacing guards** (small-model lessons, all engine-side):
+- `company_status()` — someone else's chat within `pacing.company_window` (180 s) =
+  in conversation; otherwise ALONE. Rendered in TIME / COMPANY and used by the loop.
+- While ALONE, the wait floor is `pacing.alone_min_wait` (20 s) regardless of what the
+  model asked for — prevents 3-second polling of an empty room.
+- Standing on the same tile for 4+ snapshots while ALONE → one-turn NOTICE nudging the
+  agent to work a TODO or explore.
+- **Aftermath feedback**: after executing game actions, the loop sleeps ~1.5 s, re-polls
+  the journal, and appends everything that just happened to LAST TURN under
+  "— what happened next:". Without this the model only ever sees "ok cast: done" and
+  cannot tell success from fizzle.
+- Every successful `cast` result carries a reminder that spells do nothing until
+  targeted (`DO: target <serial>`). *(M2: expose `TargetManager.IsTargeting` — one line
+  in WorldSnapshot + StatusController — and render "TARGET CURSOR ACTIVE" in NOW.)*
 
 **EVENTS** — everything else (skill gains, spell results, system messages). Same ring
 mechanics, smaller budget. Noise filter: collapse consecutive "world save" pairs, etc. —
@@ -252,6 +274,25 @@ multi-turn coherence) are largely bypassed — the model only ever answers one q
 *"here is your screen; what do you do?"*
 
 ---
+
+## 6b. Telemetry — GenAI traces over OTLP/HTTP
+
+`telemetry.py` exports one trace per turn to `<otlp_endpoint>/v1/traces` (standard
+collector port 4318 — Jaeger, Tempo, Alloy, Phoenix, Langfuse). Hand-rolled OTLP JSON,
+zero dependencies, fire-and-forget on a daemon thread (never blocks a turn; warns once
+if the collector is down).
+
+Span layout per turn, following the OpenTelemetry GenAI semantic conventions:
+- `uoagent.turn` (INTERNAL) — attributes: `uoagent.profile`, `uoagent.turn_number`,
+  `uoagent.results`, `uoagent.wait_seconds`, `uoagent.screen_tokens_est`.
+- └ `chat <model>` (CLIENT) — `gen_ai.operation.name=chat`, `gen_ai.system`,
+  `gen_ai.request.model`, `gen_ai.usage.input_tokens/output_tokens` (from the provider's
+  usage block); span events `gen_ai.content.prompt` (full system + rendered screen —
+  exactly what the agent sees) and `gen_ai.content.completion` (the raw reply).
+
+Config: `[telemetry] otlp_endpoint` ("" disables), `capture_content` (set false to keep
+prompts out of the collector), `service_name` (default `uoagent-<profile>`), so each
+character shows up as its own service in the trace UI.
 
 ## 7. Profiles — one directory per character
 

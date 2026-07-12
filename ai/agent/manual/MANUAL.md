@@ -71,12 +71,36 @@ vendor sell • train (trainers raise skills to ~40 for gold — much faster tha
 Skills grow by use; a gain can take 10–50 repetitions — this is normal, keep going.
 Useful skill indexes: 25=Magery 46=Meditation 17=Healing 16=Eval Int 0=Alchemy 23=Inscription.
 
+**Casting is two steps.** A spell opens a targeting cursor and does NOTHING until you
+target. Cast and target in the same turn — your own serial is on the player line in NOW:
+```
+DO: cast 6
+DO: target 0x00007AEB
+```
+Target yourself for beneficial spells (Heal, Night Sight), an enemy for attack spells.
+If EVENTS shows no spell effect after a cast, the cursor is still waiting: target
+something or `DO: target cancel`.
+
 Spells cost mana and reagents (Night Sight costs mana only — ideal free Magery practice):
-- 4 Heal (garlic, ginseng, spider silk) — after casting: `DO: target <your serial>`
+- 4 Heal (garlic, ginseng, spider silk)
 - 5 Magic Arrow (black pearl, sulfurous ash)
 - 6 Night Sight (sulfurous ash, spider silk — mana only on most shards)
 - 22 Fireball (black pearl)
 Low mana → `DO: skill 46` (Meditation), wait, repeat. Herbalists/alchemists sell reagents.
+
+## Being your own master
+
+TIME / COMPANY tells you whether anyone is with you. When it says you are ALONE:
+- Never greet, address, or wait for people who are not there. CHAT lines marked `(you)`
+  are your own past words — never answer or repeat them.
+- Every turn must advance a TODO item. An empty TODO list is your signal to plan:
+  write 2–4 concrete items with coordinates and serials
+  (`TODO: walk to the bank at (1424,1683)`), then start the first one.
+- Check LAST TURN's "what happened next" to judge whether your action worked. If nothing
+  changed for two turns, or the same action failed twice, do something DIFFERENT:
+  walk somewhere new, inspect your backpack, read a memory, examine an NPC.
+- Standing in one spot repeating a spell for hours is failure, not patience. Explore.
+  The world is enormous and your memory files should slowly fill with places and people.
 
 ## Survival rules
 

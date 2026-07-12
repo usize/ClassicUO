@@ -12,6 +12,7 @@ from . import protocol, providers, rings, screen, snapshots
 from .config import Profile, manual_text
 from .restapi import RestApi
 from .state import AgentState
+from .telemetry import Telemetry
 
 
 class SpeechWaker(threading.Thread):
@@ -58,8 +59,16 @@ def run(profile: Profile, once: bool = False, dry_run: bool = False) -> None:
     state = AgentState.load(profile.state_dir)
     system = screen.system_prompt(profile, protocol.PROTOCOL_SPEC, manual_text(profile.root))
     api_key = profile.api_key() if not dry_run else ""
+    telemetry = Telemetry(
+        profile.telemetry.otlp_endpoint,
+        profile.telemetry.service_name,
+        profile.telemetry.capture_content,
+    )
+    if telemetry.enabled:
+        print(f"[uoagent] telemetry → {profile.telemetry.otlp_endpoint}/v1/traces")
 
     player_name = ""
+    turn_number = 0
 
     def self_name() -> str:
         return player_name
@@ -85,9 +94,11 @@ def run(profile: Profile, once: bool = False, dry_run: bool = False) -> None:
         player_name = player.get("name") or player_name
 
         # ── observe ──────────────────────────────────────────────────────
+        turn_number += 1
+        turn_start = time.time()
         rings.poll_journal(api, state)
         snapshots.capture(api, state)
-        rendered = screen.render(api, profile, state)
+        rendered = screen.render(api, profile, state, player_name)
         state.woken_by = ""
         state.engine_notice = ""
         state.recalled = []
@@ -98,7 +109,9 @@ def run(profile: Profile, once: bool = False, dry_run: bool = False) -> None:
             return
 
         # ── decide ───────────────────────────────────────────────────────
-        reply = providers.complete(profile.llm, api_key, system, rendered)
+        llm_start = time.time()
+        reply, usage = providers.complete(profile.llm, api_key, system, rendered)
+        llm_end = time.time()
         cmds = protocol.parse(reply)
         actionable = [c for c in cmds if c.verb != "think"]
         if not actionable:
@@ -107,7 +120,21 @@ def run(profile: Profile, once: bool = False, dry_run: bool = False) -> None:
             )
 
         # ── act ──────────────────────────────────────────────────────────
+        pre_ts = state.last_journal_ts
         results, wait = protocol.execute(cmds, api, state, profile.memory_dir)
+
+        # aftermath: give the actions a moment to land, then surface what they
+        # caused (spell fizzles, skill gains, NPC replies) right in LAST TURN
+        if any(c.verb in ("do", "say", "emote", "yell", "whisper") for c in cmds):
+            time.sleep(1.5)
+            rings.poll_journal(api, state)
+            fresh = sorted(
+                rings.fmt_entry(e) for e in (state.chat + state.events)
+                if e.get("ts", "") > pre_ts
+            )
+            if fresh:
+                results += ["— what happened next:"] + fresh
+
         state.last_turn = results or ["(no actions taken)"]
         state.persist()
         state.log_transcript(rendered, reply, results)
@@ -124,7 +151,27 @@ def run(profile: Profile, once: bool = False, dry_run: bool = False) -> None:
         # ── pace ─────────────────────────────────────────────────────────
         p = profile.pacing
         delay = min(max(wait if wait is not None else p.default_wait, p.min_wait), p.max_wait)
-        print(f"[uoagent] waiting {delay:.0f}s")
+        alone, _ = screen.company_status(profile, state, player_name)
+        if alone:
+            # no one to talk to → don't let short waits burn tokens into the void
+            delay = max(delay, p.alone_min_wait)
+            snaps = state.snapshots
+            if len(snaps) >= 4 and len({(s.x, s.y) for s in snaps[-4:]}) == 1:
+                state.engine_notice = (
+                    "You have been standing in the same spot for several turns. "
+                    "Pick a TODO and act on it, or explore somewhere new — do not idle."
+                )
+
+        telemetry.emit_turn({
+            "turn_start": turn_start, "llm_start": llm_start,
+            "llm_end": llm_end, "turn_end": time.time(),
+            "provider": profile.llm.provider, "model": profile.llm.model,
+            "system": system, "screen": rendered, "reply": reply,
+            "usage": usage, "results": results, "wait": delay,
+            "profile": profile.root.name, "turn_number": turn_number,
+        })
+
+        print(f"[uoagent] waiting {delay:.0f}s{' (alone)' if alone else ''}")
         _sleep_interruptible(delay, waker, state)
 
 

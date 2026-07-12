@@ -24,7 +24,8 @@ def _http_json(url: str, headers: dict, body: dict, timeout: float = 300.0) -> d
         return json.loads(resp.read().decode("utf-8", "replace"))
 
 
-def _complete_once(cfg: LlmConfig, api_key: str, system: str, user: str) -> str:
+def _complete_once(cfg: LlmConfig, api_key: str, system: str, user: str) -> tuple[str, dict]:
+    """Returns (text, usage) where usage = {input_tokens, output_tokens}."""
     base = (cfg.base_url or DEFAULT_BASES[cfg.provider]).rstrip("/")
 
     if cfg.provider == "anthropic":
@@ -39,7 +40,11 @@ def _complete_once(cfg: LlmConfig, api_key: str, system: str, user: str) -> str:
                 "messages": [{"role": "user", "content": user}],
             },
         )
-        return "".join(b.get("text", "") for b in data.get("content", []))
+        u = data.get("usage") or {}
+        return (
+            "".join(b.get("text", "") for b in data.get("content", [])),
+            {"input_tokens": u.get("input_tokens", 0), "output_tokens": u.get("output_tokens", 0)},
+        )
 
     # openai-compatible: OpenAI, DeepSeek, OpenRouter, Ollama, vLLM, LM Studio
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -48,7 +53,7 @@ def _complete_once(cfg: LlmConfig, api_key: str, system: str, user: str) -> str:
         headers,
         {
             "model": cfg.model,
-            "max_tokens": cfg.max_tokens,
+            "max_completion_tokens" if cfg.provider == "openai" else "max_tokens": cfg.max_tokens,
             "temperature": cfg.temperature,
             "messages": [
                 {"role": "system", "content": system},
@@ -57,10 +62,14 @@ def _complete_once(cfg: LlmConfig, api_key: str, system: str, user: str) -> str:
         },
     )
     choices = data.get("choices") or [{}]
-    return (choices[0].get("message") or {}).get("content") or ""
+    u = data.get("usage") or {}
+    return (
+        (choices[0].get("message") or {}).get("content") or "",
+        {"input_tokens": u.get("prompt_tokens", 0), "output_tokens": u.get("completion_tokens", 0)},
+    )
 
 
-def complete(cfg: LlmConfig, api_key: str, system: str, user: str) -> str:
+def complete(cfg: LlmConfig, api_key: str, system: str, user: str) -> tuple[str, dict]:
     """Call the LLM with exponential backoff. Raises only KeyboardInterrupt."""
     delay = 5.0
     while True:

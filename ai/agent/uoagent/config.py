@@ -36,7 +36,16 @@ class Pacing:
     min_wait: float = 2.0
     max_wait: float = 120.0
     default_wait: float = 20.0
+    alone_min_wait: float = 20.0   # floor while no one is speaking to the agent
+    company_window: float = 180.0  # seconds since another's speech = "in conversation"
     wake_on_speech: bool = True
+
+
+@dataclass
+class TelemetryConfig:
+    otlp_endpoint: str = ""        # e.g. "http://127.0.0.1:4318"; empty = disabled
+    capture_content: bool = True   # include full prompt/completion in span events
+    service_name: str = ""         # defaults to "uoagent-<profile dir name>"
 
 
 @dataclass
@@ -45,6 +54,7 @@ class Profile:
     api_base: str = "http://127.0.0.1:9000"
     llm: LlmConfig = field(default_factory=LlmConfig)
     pacing: Pacing = field(default_factory=Pacing)
+    telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     budgets: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_BUDGETS))
 
     @property
@@ -81,6 +91,9 @@ def load_profile(path: str | Path) -> Profile:
 
     llm = LlmConfig(**{k: v for k, v in raw.get("llm", {}).items()})
     pacing = Pacing(**{k: v for k, v in raw.get("pacing", {}).items()})
+    telemetry = TelemetryConfig(**{k: v for k, v in raw.get("telemetry", {}).items()})
+    if not telemetry.service_name:
+        telemetry.service_name = f"uoagent-{root.name}"
     budgets = dict(DEFAULT_BUDGETS)
     budgets.update(raw.get("budget", {}))
 
@@ -89,6 +102,7 @@ def load_profile(path: str | Path) -> Profile:
         api_base=raw.get("api", {}).get("base", "http://127.0.0.1:9000").rstrip("/"),
         llm=llm,
         pacing=pacing,
+        telemetry=telemetry,
         budgets=budgets,
     )
     prof.state_dir.mkdir(exist_ok=True)

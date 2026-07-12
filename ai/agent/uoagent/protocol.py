@@ -171,7 +171,10 @@ def _do(api: RestApi, arg: str) -> str:
         if cmd == "skill" and args:
             return post("actions/skill", {"index": int(args[0])})
         if cmd in ("cast", "spell") and args:
-            return post("actions/spell", {"index": int(args[0])})
+            r = post("actions/spell", {"index": int(args[0])})
+            if not r.startswith("ERROR"):
+                r += " — spells do NOTHING until targeted: follow with 'DO: target <serial>' (yourself for beneficial spells)"
+            return r
         if cmd == "backpack":
             return query("containers/backpack")
         if cmd == "container" and args:

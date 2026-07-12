@@ -43,7 +43,29 @@ def poll_journal(api: RestApi, state: AgentState) -> None:
             state.last_journal_ts = ts
 
 
-def fmt_entry(e: dict) -> str:
+def fmt_entry(e: dict, self_name: str = "") -> str:
     hhmmss = e["ts"][11:19] if len(e.get("ts", "")) >= 19 else "--:--:--"
-    who = f"[{e['name']}] " if e.get("name") else ""
+    name = e.get("name") or ""
+    if self_name and name.lower() == self_name.lower():
+        name += " (you)"
+    who = f"[{name}] " if name else ""
     return f"{hhmmss} {who}{e['text']}"
+
+
+def last_other_speech(state: AgentState, self_name: str) -> dict | None:
+    """Newest chat entry spoken by someone other than the agent, or None."""
+    me = self_name.lower()
+    for e in reversed(state.chat):
+        if (e.get("name") or "").lower() not in ("", "system", me):
+            return e
+    return None
+
+
+def entry_age_seconds(e: dict) -> float | None:
+    from datetime import datetime
+
+    try:
+        ts = datetime.fromisoformat(e["ts"])
+        return (datetime.now(ts.tzinfo) - ts).total_seconds()
+    except (ValueError, KeyError):
+        return None

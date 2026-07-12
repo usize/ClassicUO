@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 from . import memory, rings, snapshots
 from .config import Profile
@@ -60,7 +61,21 @@ def render_now(api: RestApi, budget: int) -> str:
     return "\n".join(lines)
 
 
-def render(api: RestApi, profile: Profile, state: AgentState) -> str:
+def company_status(profile: Profile, state: AgentState, self_name: str) -> tuple[bool, str]:
+    """(alone, human-readable line). Alone = no one else has spoken recently."""
+    other = rings.last_other_speech(state, self_name)
+    age = rings.entry_age_seconds(other) if other else None
+    if other and age is not None and age <= profile.pacing.company_window:
+        return False, (f"{other['name']} spoke {int(age)}s ago — you are in conversation; "
+                       "keep them company.")
+    if other and age is not None:
+        return True, (f"no one has spoken to you in {int(age // 60)}m (last: {other['name']}). "
+                      "You are ALONE. Do not greet or wait for anyone — pursue your GOALS.")
+    return True, ("you are ALONE — no one has spoken to you. "
+                  "Do not greet empty air or ask questions to nobody; pursue your GOALS.")
+
+
+def render(api: RestApi, profile: Profile, state: AgentState, self_name: str = "") -> str:
     b = profile.budgets
     parts: list[str] = []
 
@@ -71,6 +86,9 @@ def render(api: RestApi, profile: Profile, state: AgentState) -> str:
         section("WOKEN", state.woken_by)
     if state.engine_notice:
         section("NOTICE", state.engine_notice)
+
+    _, company = company_status(profile, state, self_name)
+    section("TIME / COMPANY", f"Now: {time.strftime('%H:%M:%S')}. {company}")
 
     goals = profile.read_doc("GOALS.md")
     if goals:
@@ -89,8 +107,8 @@ def render(api: RestApi, profile: Profile, state: AgentState) -> str:
 
     section("HISTORY (recent world changes)", snapshots.render_history(state)[: b["history"] * 4])
     section("NOW", render_now(api, b["now"]))
-    section("CHAT (full text, newest last)",
-            "\n".join(_fit_lines_newest([rings.fmt_entry(e) for e in state.chat], b["chat"])) or "(quiet)")
+    section("CHAT (newest last; '(you)' marks YOUR OWN past words — never answer them)",
+            "\n".join(_fit_lines_newest([rings.fmt_entry(e, self_name) for e in state.chat], b["chat"])) or "(quiet)")
     section("EVENTS",
             "\n".join(_fit_lines_newest([rings.fmt_entry(e) for e in state.events], b["events"])) or "(none)")
     section("LAST TURN",
