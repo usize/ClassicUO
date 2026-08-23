@@ -18,6 +18,20 @@ Then `./ai/uo player` to read your character's full stats and skills.
 
 ---
 
+## Knowledge Base
+
+This skill has a `knowledge/` folder next to this file — world geography (city and
+dungeon coordinates, the moongate network), lore (what creatures and items are),
+and how-to-play guides (skills, professions, combat, training). This SKILL.md covers
+*how to act*; `knowledge/` covers *what to know*.
+
+Consult it whenever you hit a fact you're unsure of: "where is X", "what is a
+moongate", "how do I train Y", "what does this creature/item do". Start at
+`knowledge/README.md` for the index, or grep directly: `grep -ril "term" .agents/skills/uo/knowledge/`.
+You don't need to read it up front — it's a reference, not required reading.
+
+---
+
 ## Roleplay and Personality
 
 Inhabit the character fully. Read their name, class, and skill set from the API and
