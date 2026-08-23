@@ -4,7 +4,7 @@ base = "http://127.0.0.1:9000"
 [llm]
 provider = "openai"          # "anthropic" | "openai" (openai-compatible: DeepSeek, Ollama, OpenRouter…)
 #model = "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
-model = "gpt-5.4-nano"
+model = "gpt-5.4"
 api_key_env = "OPENAI_API_KEY"
 #base_url = "http://127.0.0.1:8001/v1"   # example for provider = "openai"
 max_tokens = 32000
@@ -27,13 +27,13 @@ capture_content = true            # include full prompt/completion in spans
 # service_name = "uoagent-gemma"  # defaults to uoagent-<profile dir>
 
 [budget]                        # tokens per screen section (chars/4 estimate)
-goals = 300
-notes = 600
-todo = 200
-memory_index = 300
-recalled = 800
-history = 600
-now = 2200
-chat = 1500
-events = 500
-last_turn = 600
+goals = 1024
+notes = 2048
+todo = 1024
+memory_index = 4096
+recalled = 2048
+history = 4096
+now = 8192
+chat = 4096
+events = 4096
+last_turn = 8192
