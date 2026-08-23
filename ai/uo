@@ -259,6 +259,13 @@ case "$cmd" in
         _post "actions/stopwalk" '{}'
         ;;
 
+    # ── Recovery ───────────────────────────────────────────────────────────
+
+    # resync — request a full client/server state resync (clears stuck walk state)
+    resync)
+        _post "actions/resync" '{}'
+        ;;
+
     # ── Speak ─────────────────────────────────────────────────────────────
 
     say)
@@ -655,6 +662,9 @@ MOVE
   uo follow <serial> [--persistent] [interval]
                                 Pathfind to mobile/item. Use -p for continuous follow
   uo stopwalk                   Cancel in-progress pathfinding
+
+RECOVERY
+  uo resync                     Request a full client/server state resync (clears stuck walk state)
 
 SPEAK
   uo say    <text>              Say something aloud

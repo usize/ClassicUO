@@ -4,6 +4,7 @@ using System.Threading;
 using ClassicUO;
 using ClassicUO.Game;
 using ClassicUO.Game.Data;
+using ClassicUO.Network;
 using ClassicUO.RestApi.Models;
 using ClassicUO.Utility.Logging;
 using Microsoft.AspNetCore.Mvc;
@@ -209,6 +210,14 @@ namespace ClassicUO.RestApi.Controllers
         {
             Enqueue(() => GetWorld()?.Player?.Pathfinder.StopAutoWalk());
             return Accepted();
+        }
+
+        /// <summary>Request a full client/server state resync (clears stuck walk state).</summary>
+        [HttpPost("resync")]
+        public IActionResult Resync()
+        {
+            Enqueue(() => NetClient.Socket.Send_Resync());
+            return Ok(new { sent = true });
         }
 
         /// <summary>Opens the nearest door in the player's facing direction (server macro).</summary>

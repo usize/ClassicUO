@@ -26,6 +26,8 @@ namespace ClassicUO.RestApi.Models
             Skills = BuildSkills(player);
             IsTargeting = targetManager?.IsTargeting ?? false;
             TargetingType = targetManager?.TargetingType.ToString() ?? "None";
+            IsParalyzed = player.IsParalyzed;
+            Walker = new WalkerDiagnosticsDto(player.Walker);
         }
 
         public uint Serial { get; }
@@ -44,6 +46,8 @@ namespace ClassicUO.RestApi.Models
         public IReadOnlyList<SkillDto> Skills { get; }
         public bool IsTargeting { get; }
         public string TargetingType { get; }
+        public bool IsParalyzed { get; }
+        public WalkerDiagnosticsDto Walker { get; }
 
         private static IReadOnlyList<ItemDto> BuildEquipment(PlayerMobile player)
         {
@@ -92,5 +96,17 @@ namespace ClassicUO.RestApi.Models
 
             return skills;
         }
+    }
+
+    internal sealed class WalkerDiagnosticsDto
+    {
+        public WalkerDiagnosticsDto(WalkerManager walker)
+        {
+            WalkingFailed = walker.WalkingFailed;
+            StepsCount = walker.StepsCount;
+        }
+
+        public bool WalkingFailed { get; }
+        public int StepsCount { get; }
     }
 }
