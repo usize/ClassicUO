@@ -927,11 +927,11 @@ namespace ClassicUO.Game
             return true;
         }
 
-        public bool WalkTo(int x, int y, int z, int distance)
+        public int WalkTo(int x, int y, int z, int distance)
         {
             if (_world.Player == null /*|| World.Player.Stamina == 0*/ || _world.Player.IsParalyzed)
             {
-                return false;
+                return 0;
             }
 
             if (distance == 0 && IsBlocked(x, y, z))
@@ -992,7 +992,7 @@ namespace ClassicUO.Game
                 AutoWalking = false;
             }
 
-            return _pathSize != 0;
+            return _pathSize;
         }
 
         private bool IsBlocked(int x, int y, int z)

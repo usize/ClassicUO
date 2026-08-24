@@ -260,7 +260,7 @@ namespace ClassicUO
                     break;
                 case 4:
                     var args = Unsafe.AsRef<(int, int, int, int, int)>(cmd.ToPointer());
-                    bool started = Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5) ?? false;
+                    bool started = (Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5) ?? 0) > 0;
                     return (IntPtr)Unsafe.AsPointer(ref started);
             }
 

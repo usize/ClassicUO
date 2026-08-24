@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace ClassicUO.RestApi
 {
@@ -10,6 +11,23 @@ namespace ClassicUO.RestApi
         public void Enqueue(Action action)
         {
             _actions.Enqueue(action);
+        }
+
+        public Task<T> EnqueueAwait<T>(Func<T> action)
+        {
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Enqueue(() =>
+            {
+                try
+                {
+                    tcs.TrySetResult(action());
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            });
+            return tcs.Task;
         }
 
         public bool TryDequeue(out Action action)

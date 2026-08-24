@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using ClassicUO;
 using ClassicUO.Game;
 using ClassicUO.Game.Data;
@@ -165,15 +166,17 @@ namespace ClassicUO.RestApi.Controllers
         }
 
         [HttpPost("pathfind")]
-        public IActionResult Pathfind([FromBody] PathfindRequest request)
+        public async Task<IActionResult> Pathfind([FromBody] PathfindRequest request)
         {
+            int? pathLength;
+
             if (request.Serial.HasValue)
             {
                 var serial = request.Serial.Value;
-                Enqueue(() =>
+                pathLength = await EnqueueRun<int?>(() =>
                 {
                     var world = GetWorld();
-                    if (world?.Player == null) return;
+                    if (world?.Player == null) return null;
 
                     int tx, ty, tz;
                     if (world.Mobiles.TryGetValue(serial, out var mob) && mob != null && !mob.IsDestroyed)
@@ -184,11 +187,12 @@ namespace ClassicUO.RestApi.Controllers
                     {
                         tx = item.X; ty = item.Y; tz = item.Z;
                     }
-                    else return;
+                    else return null;
 
-                    world.Player.Pathfinder.WalkTo(tx, ty, tz, 1);
+                    return world.Player.Pathfinder.WalkTo(tx, ty, tz, 1);
                 });
-                return Accepted();
+
+                return PathfindAck(pathLength);
             }
 
             if (!request.X.HasValue || !request.Y.HasValue)
@@ -196,13 +200,15 @@ namespace ClassicUO.RestApi.Controllers
 
             var targetX = request.X.Value;
             var targetY = request.Y.Value;
-            Enqueue(() =>
+            var targetZ = request.Z;
+            pathLength = await EnqueueRun<int?>(() =>
             {
                 var world = GetWorld();
-                if (world?.Player == null) return;
-                world.Player.Pathfinder.WalkTo(targetX, targetY, request.Z ?? world.Player.Z, 0);
+                if (world?.Player == null) return null;
+                return world.Player.Pathfinder.WalkTo(targetX, targetY, targetZ ?? world.Player.Z, 0);
             });
-            return Accepted();
+
+            return PathfindAck(pathLength);
         }
 
         [HttpPost("stopwalk")]
@@ -372,6 +378,28 @@ namespace ClassicUO.RestApi.Controllers
                     Log.Error($"REST action failed: {ex}");
                 }
             });
+        }
+
+        private async Task<T> EnqueueRun<T>(Func<T> action, int timeoutMs = 5000)
+        {
+            try
+            {
+                return await _actionQueue.EnqueueAwait(action).WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
+            }
+            catch (OperationCanceledException)
+            {
+                return default;
+            }
+        }
+
+        private IActionResult PathfindAck(int? pathLength)
+        {
+            if (pathLength == null)
+            {
+                return Ok(new { pathFound = false, pathLength = 0, error = "timeout" });
+            }
+
+            return Ok(new { pathFound = pathLength.Value > 0, pathLength = pathLength.Value });
         }
     }
 }
