@@ -76,6 +76,42 @@ Two things make the built-in A* unreliable for bot navigation (both in
 - Node bookkeeping is set/dictionary-backed (no linear pool scans in the add path).
 - Toggle works end-to-end and changes pathfinding behavior in monster fields; default off.
 
+## Implementation notes (deviations from the letter of the spec)
+
+- **Free-slot allocation via index stacks** (`_freeOpen`/`_freeClosed`): the acceptance
+  bar says "no linear pool scans in the add path", which includes the free-slot scans.
+  Both pools now allocate from a `Stack<int>` refilled in `WalkTo` (40k pushes ≈ 40µs,
+  negligible). Closed slots are never freed during a search, so the stack never regrows.
+- **`MoveToClosedList(openIndex)` extracted** from `AddNodeToList`: the open→closed branch
+  needs the open-list *index* (to push it back onto `_freeOpen`), but `AddNodeToList(1,…)`
+  only received the `PathNode`. `FindCheapestNode` now calls `MoveToClosedList(cheapestNode)`
+  directly; `AddNodeToList` handles open-list adds only. `OpenNodes` call site updated.
+- **Start node allocated from `_freeClosed`** in `FindPath` (no more hardcoded `_closedList[0]`
+  magic — the old slot-0 assumption would desync from the stack).
+- The pre-existing double-cost quirk in the open-node update
+  (`node.DistFromStartCost = startCost + cost`) was preserved verbatim — behavior parity,
+  not a fix for this item.
+- `FindCheapestNode` stays linear, per spec.
+
+## Test results (live, Trammel)
+
+- Failing search (~235t to the impassable mountain mass, open-ground start):
+  `{"pathFound":false}` in **0.16–0.18 s** wall (bar: <1 s). Note: the searchable region
+  is bounded by *loaded* map chunks (a few dozen tiles around the player), so a ground-level
+  pathfind can't actually exhaust the 20k budget; the <1 s bar is met with wide margin and
+  the add path is scan-free by construction.
+- Successful search: 22-tile path in open ground, walked to completion.
+- Toggle in a monster field (countryside north of the swamp, wolves/bears/ettins):
+  same 30-tile target, **OFF → pathLength 32 (detour around the wolf), ON → pathLength 27
+  (straight through)**. Player JSON `ignoreMobiles` flips with the command; process restart
+  resets to default off.
+- Regressions: `goto`-style short hop OK; `say` during an active pathfind lands in journal.
+- Collateral finding: the character died to a grey wolf twice in this field while testing
+  the ON route — expected (that's what the toggle does). First death handled via the
+  healer resurrection gump; second death the gump did not appear (no healer nearby), so
+  she was left waiting for one — resurrection mechanics: the gump is offered by a *healer
+  present at the corpse*, not sent automatically.
+
 ## Commit
 
 `Speed up pathfinder node bookkeeping; add mobile-obstacle toggle`

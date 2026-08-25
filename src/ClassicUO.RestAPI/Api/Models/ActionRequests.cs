@@ -95,6 +95,12 @@ namespace ClassicUO.RestApi.Models
         public int? Z { get; set; }
     }
 
+    public class IgnoreMobilesRequest
+    {
+        /// <summary>True lets pathfinding route through standing monsters (default false).</summary>
+        public bool Enabled { get; set; }
+    }
+
     public class PickUpRequest
     {
         /// <summary>Serial of the item to pick up (puts in cursor).</summary>

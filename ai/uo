@@ -337,6 +337,14 @@ case "$cmd" in
         _post "actions/stopwalk" '{}'
         ;;
 
+    # ignoremobiles <on|off> — let pathfinding route through standing monsters (default: off)
+    ignoremobiles)
+        mode="${1:?Usage: uo ignoremobiles <on|off>}"
+        enabled=false
+        [[ "$mode" == "on" || "$mode" == "true" ]] && enabled=true
+        _post "actions/ignoremobiles" "{\"enabled\":$enabled}"
+        ;;
+
     # ── Recovery ───────────────────────────────────────────────────────────
 
     # resync — request a full client/server state resync (clears stuck walk state)
@@ -738,9 +746,10 @@ MOVE
   uo walk <dir> <n> [run]       n steps with pacing (~0.4s between steps)
   uo goto <x> <y> [z]          Pathfind to world coordinates (A* around obstacles)
   uo travel <x> <y> [z]        Server-side travel: walk there in segments, report progress
-  uo follow <serial> [--persistent] [interval]
-                                Pathfind to mobile/item. Use -p for continuous follow
-  uo stopwalk                   Cancel in-progress pathfinding
+   uo follow <serial> [--persistent] [interval]
+                                 Pathfind to mobile/item. Use -p for continuous follow
+   uo stopwalk                   Cancel in-progress pathfinding
+   uo ignoremobiles <on|off>     Let pathfinding route through standing monsters (default: off)
 
 RECOVERY
   uo resync                     Request a full client/server state resync (clears stuck walk state)

@@ -29,6 +29,7 @@ namespace ClassicUO.RestApi.Models
             IsParalyzed = player.IsParalyzed;
             Walker = new WalkerDiagnosticsDto(player.Walker);
             Travel = new TravelDto(player);
+            IgnoreMobiles = Pathfinder.IgnoreMobileObstacles;
         }
 
         public uint Serial { get; }
@@ -50,6 +51,7 @@ namespace ClassicUO.RestApi.Models
         public bool IsParalyzed { get; }
         public WalkerDiagnosticsDto Walker { get; }
         public TravelDto Travel { get; }
+        public bool IgnoreMobiles { get; }
 
         private static IReadOnlyList<ItemDto> BuildEquipment(PlayerMobile player)
         {

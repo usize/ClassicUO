@@ -262,6 +262,24 @@ namespace ClassicUO.RestApi.Controllers
             return Accepted();
         }
 
+        /// <summary>Let pathfinding route through standing monsters (client-side, default off).</summary>
+        [HttpPost("ignoremobiles")]
+        public async Task<IActionResult> IgnoreMobiles([FromBody] IgnoreMobilesRequest request)
+        {
+            var value = await EnqueueRun<bool?>(() =>
+            {
+                Pathfinder.IgnoreMobileObstacles = request.Enabled;
+                return Pathfinder.IgnoreMobileObstacles;
+            });
+
+            if (value == null)
+            {
+                return Ok(new { ignoreMobiles = request.Enabled, error = "timeout" });
+            }
+
+            return Ok(new { ignoreMobiles = value.Value });
+        }
+
         /// <summary>Request a full client/server state resync (clears stuck walk state).</summary>
         [HttpPost("resync")]
         public IActionResult Resync()
