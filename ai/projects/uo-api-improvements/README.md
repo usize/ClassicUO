@@ -10,7 +10,7 @@ one commit. Work them in order — later items build on earlier ones.
 - [x] 01 — resync endpoint + walker diagnostics in player output (`bbc2f6e`)
 - [x] 02 — pathfind returns pathFound/pathLength (introduces the awaited-action helper) (`3f7168f`)
 - [x] 03 — server-side chunked travel (`actions/travel`) with progress (`4c4bea7`)
-- [x] 04 — pathfinder: O(1) duplicate checks, higher node cap, mobile-obstacle toggle
+- [x] 04 — pathfinder: O(1) duplicate checks, higher node cap, mobile-obstacle toggle (`25973d`)
 - [ ] 05 — journal `limit` returns the most recent entries
 - [ ] 06 — action endpoints return JSON acks (move/use/attack/say)
 - [ ] 07 — rewrite `ai/uo goto` around travel + honest failure modes

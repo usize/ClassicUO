@@ -1,23 +1,22 @@
 # HANDOFF — UO AI Sandbox (read this first)
 
-_Last updated: 2026-08-24 23:02 PDT, branch `uo-api-improvements`._
+_Last updated: 2026-08-25 12:51 PDT, branch `uo-api-improvements`._
 
 This repo is an experiment: let an LLM **play** Ultima Online through a local REST API
 (`http://127.0.0.1:9000`) exposed by a headless ClassicUO client, and drive it with the
 `./ai/uo` bash CLI + the `uo` skill. Two workstreams are in flight:
 
 - **A — REST API fixes** (`ai/projects/uo-api-improvements/`): 9 numbered specs fixing
-  navigation/observability bugs found during live play. Items **01–03 done**, 04–09
+  navigation/observability bugs found during live play. Items **01–04 done**, 05–09
   not started.
 - **B — Playable harness** (this doc, section 4): the bigger goal — a harness where the LLM
   is the *brain* (chooses tasks, socializes, reacts) and a deterministic engine is the *hands*
   (executes long repetitive tasks), with compact observations and persistent play-state.
 
-**Immediate next action for a fresh session:** start item 04 (pathfinder O(1) node
-bookkeeping, node cap 20k, mobile-obstacle toggle) per
-`ai/projects/uo-api-improvements/04-*.md`. Read the item-03 completion notes below first —
-they record three deliberate deviations (25-tile segments, z-aware arrival, cooldown
-backoff) that item 04 interacts with.
+**Immediate next action for a fresh session:** start item 05 (`journal?limit` returns most
+recent N) per `ai/projects/uo-api-improvements/05-*.md`. First: check whether Gemma has
+been resurrected (she was left **dead** at (1453,2072,0) — see section 4; a background
+poller was watching for the healer gump).
 
 ---
 
@@ -25,6 +24,7 @@ backoff) that item 04 interacts with.
 
 - Branch: `uo-api-improvements` (based on `ai_sandbox`).
 - Recent commits (newest first):
+  - `25973dff5` — item 04: pathfinder O(1) bookkeeping, 20k cap, mobile-obstacle toggle
   - `4c4bea701` — item 03: server-side chunked travel (`actions/travel`) + progress
   - `3f7168fe2` — item 02: pathfind returns `pathFound`/`pathLength` (+ awaited-action helper)
   - `bbc2f6eaa` — item 01: `resync` endpoint + walker diagnostics in `player`
@@ -46,7 +46,7 @@ context (build/restart, threading model, safety). Status:
 | 01 | `resync` endpoint + `isParalyzed`/`walker` in `player` | ✅ committed `bbc2f6e` |
 | 02 | `pathfind` returns `{pathFound,pathLength}`; `EnqueueAwait<T>`/`EnqueueRun<T>` helper | ✅ committed `3f7168f` |
 | 03 | **Server-side chunked travel** (`actions/travel`, 25-tile segments, progress) | ✅ committed `4c4bea7` (see notes below) |
-| 04 | Pathfinder O(1) node bookkeeping, cap 20k, mobile-obstacle toggle | ⬜ not started |
+| 04 | Pathfinder O(1) node bookkeeping, cap 20k, mobile-obstacle toggle | ✅ committed `25973d` (see notes below) |
 | 05 | `journal?limit` returns most recent N | ⬜ not started |
 | 06 | Action endpoints return JSON acks (move/use/attack/say…) | ⬜ not started |
 | 07 | Rewrite `ai/uo goto` around travel, honest exit codes | ⬜ not started |
@@ -86,6 +86,46 @@ it, leaving two clients logged in as Gemma (one zombie spun ~99% CPU until kille
 runbook (project README + this doc) now waits for the process to be gone before relaunching.
 Also: measure client CPU with `top -l 2 -s 5 -pid <pid> -stats pid,cpu`, not
 `ps pcpu`/`ps -o time` (both gave bogus readings on this box).
+
+### Item 04 — completion record (2026-08-25)
+
+Implemented, tested live, committed as `25973d`. All spec tests passed:
+
+- **Perf (failing search):** ~235-tile unreachable target (the mountain mass) from open
+  ground → `{"pathFound":false}` in **0.16–0.18 s** (bar: <1 s). Caveat: the searchable
+  region is bounded by *loaded* map chunks, so a ground pathfind can't exhaust the 20k
+  budget — the bar is met with margin and the add path is scan-free by construction.
+- **Perf (successful search):** 22-tile open-ground path found and walked to completion.
+- **Toggle in a monster field** (countryside N of the swamp — wolves/bears/ettins/pigs):
+  same 30-tile target → **OFF: pathLength 32 (detour around the wolf), ON: pathLength 27
+  (straight through)**. `player.ignoreMobiles` flips with `./ai/uo ignoremobiles on|off`;
+  process restart resets to default off.
+- **Regressions:** short `goto` hop OK; `say` during an active pathfind lands in the journal.
+
+**Deviations (documented in `04-pathfinder-cap-and-mobile-obstacles.md`):** free-slot
+allocation for *both* pools uses `Stack<int>` index stacks (the acceptance bar forbids any
+linear pool scan in the add path); the open→closed move was extracted to
+`MoveToClosedList(openIndex)` (it needs the open index to refund `_freeOpen`); the start
+node is now allocated from `_freeClosed` (no hardcoded slot-0). `FindCheapestNode` stays
+linear per spec. The pre-existing double-cost quirk in the open-node update was preserved
+(behavior parity).
+
+**Ops findings from the field trip to the monster field (all hit live):**
+1. **Long idle → stuck walk state.** After ~35 min of no movement, *all* walks fail with
+   normal diagnostics; `./ai/uo resync` cleared it (worked again here).
+2. **Hilly terrain breaks 25-tile travel hops.** The swamp/ridge country north of the old
+   spawn has z=5 ridges and cliffs: a 25-tile segment hop fails when the only route is a
+   long detour *outside the loaded-chunk window* (72-tile detours work, longer don't).
+   `travel` then backs off and sits. Workaround that worked: 15-tile `pathfind` hops in a
+   loop (see `/tmp/hop.sh` pattern — 15t hops with 8t/5t fallback + resync on no-progress).
+3. **The countryside N of the swamp has real spawns**: grey/timber wolves, grizzly bears,
+   ettins, pigs, horses, sheep (z=0 and z=5). Gemma **died to a grey wolf twice** testing
+   the ON route (HP 10 → 0).
+4. **Resurrection gump = healer-offered, not automatic.** First death: "resurrected here
+   by this healer" gump appeared and CONTINUE (buttonID 1) worked (full-ish HP, spot of
+   death). Second death: no gump after 10+ min — no healer nearby. Login while dead does
+   NOT auto-resurrect on this server. Left a 30-min background poller
+   (`/tmp/resurrect.sh` → `/tmp/resurrect.log`) watching for the gump.
 
 ## 3. Workstream B — Playable harness (the goal)
 
@@ -137,40 +177,55 @@ skill first (that's what the user is watching), keep uoagent as a second consume
 ## 4. Operational runbook
 
 - **API**: `http://127.0.0.1:9000/api`. **CLI**: `./ai/uo` from repo root (`./ai/uo help`).
-- **Character**: Gemma, serial `0x7AEB` (decimal 31467), Trammel. As of this doc: at
-  `(1539,2000,0)` — **outdoors**, open country at the W edge of the big mountain mass,
-  south of Britain (left the Warriors' Guild during item-03 testing), **gold 0**, weight
-  23/134, HP 63/63, MP 58/58. Skills: Meditation 36.8, Wrestling 31.7, Eval Int 30.7,
-  Magery 30.0, Focus 16.5, Anatomy 7.5. Young-player protection (PvP-safe) was active at
-  session start.
+- **Character**: Gemma, serial `0x7AEB` (decimal 31467), Trammel. As of this doc: **DEAD**
+  at `(1453,2072,0)` (killed by a grey wolf while item-04 testing) — ghost standing in the
+  countryside monster field N of the swamp; a 30-min poller was watching for the healer
+  resurrection gump (`/tmp/resurrect.log`). If still dead next session: either poll for the
+  gump (healer-offered, see item-04 notes), or restart the client and wait — or accept the
+  walk-to-a-shrine slog (Spirituality shrine (1589,2485,5) is nearest, ~430t). **Gold 0**,
+  weight ~27, Wrestling now 32.0. A second player character, **Shanley**, was sighted
+  roaming this same area (1464,2107,0) — possibly the user's alt.
 - **Build + restart the headless client** (required to test any C# change):
-  ```bash
-  dotnet build src/ClassicUO.RestAPI/ClassicUO.RestAPI.csproj
-  pkill -f "ClassicUO.RestAPI"
-  # .NET shutdown takes a few seconds — wait for the old process to actually die,
-  # otherwise two clients log in as the same character and race for port 9000:
-  for i in $(seq 1 20); do pgrep -f "ClassicUO.RestAPI" >/dev/null || break; sleep 1; done
-  nohup ./run_rest_client.sh > /tmp/cuo-api.log 2>&1 &
-  for i in $(seq 1 45); do ./ai/uo status | grep -q '"inGame":true' && break; sleep 2; done
-  ./ai/uo status   # then: ./ai/uo stopwalk
-  ```
-  Autologin is on; character reloads in place. If it never goes inGame, read `/tmp/cuo-api.log`.
+   ```bash
+   dotnet build src/ClassicUO.RestAPI/ClassicUO.RestAPI.csproj
+   pkill -f "ClassicUO.RestAPI"
+   # .NET shutdown often HANGS past 40 s ("Application is shutting down..." with the game
+   # thread stuck) — wait for the real client binary, then KILL. Two gotchas:
+   #   * pgrep -f "ClassicUO.RestAPI" matches YOUR OWN shell (its cmdline contains the
+   #     pattern) — use the binary path instead.
+   #   * TERM alone is often not enough; KILL after ~40 s.
+   for i in $(seq 1 40); do sleep 1
+     pgrep -f "bin/Debug/net10.0/cuo-api" >/dev/null || break; done
+   pgrep -f "bin/Debug/net10.0/cuo-api" >/dev/null && pkill -9 -f "bin/Debug/net10.0/cuo-api"
+   pgrep -f "dotnet run --project.*ClassicUO.RestAPI" >/dev/null && pkill -9 -f "dotnet run --project.*ClassicUO.RestAPI"
+   sleep 2
+   nohup ./run_rest_client.sh > /tmp/cuo-api.log 2>&1 &
+   for i in $(seq 1 45); do ./ai/uo status | grep -q '"inGame":true' && break; sleep 2; done
+   ./ai/uo status   # then: ./ai/uo stopwalk
+   ```
+   Autologin is on; character reloads in place. If it never goes inGame, read `/tmp/cuo-api.log`.
 - **Test safety**: no attacking, no `warmode on`, no buying/selling during dev tests.
   Movement/speech/emote are fine.
 - **Known transient walk-freeze**: position stays put with ALL diagnostics normal
-  (`isParalyzed:false`, `walker:{walkingFailed:false,stepsCount:0}`). `./ai/uo resync` clears
-  it reliably (worked repeatedly). Do NOT chase it client-side; resync and move on.
+  (`isParalyzed:false`, `walker:{walkingFailed:false,stepsCount:0}`). Happens after long
+  idle stretches. `./ai/uo resync` clears it reliably (worked repeatedly). Do NOT chase it
+  client-side; resync and move on.
 - **Shell is zsh**: unquoted `$var` does NOT word-split — use explicit `&&` chains in test
   loops (a `for t in "x y"; do uo goto $t; done` loop silently passed "x y" as one arg).
-- **Pathfinder facts**: `WalkTo` is synchronous A*, ≤10k nodes, ~0.5 s worst case; returns
-  node count incl. start tile (0 = no path). Waypoint calls use `distance:0` (auto-bumps to 1
-  if blocked). UO north = y−1.
+- **Pathfinder facts**: `WalkTo` is synchronous A*, ≤**20k** nodes (item 04), O(1) node
+  bookkeeping (sets/dicts + free-index stacks), ~0.2 s worst case observed for failing
+  searches; returns node count incl. start tile (0 = no path). Waypoint calls use
+  `distance:0` (auto-bumps to 1 if blocked). UO north = y−1. `Pathfinder.IgnoreMobileObstacles`
+  (REST: `POST /api/actions/ignoremobiles`, CLI: `uo ignoremobiles on|off`, player field
+  `ignoreMobiles`) lets A* route through standing mobiles; default off.
 
 ## 5. World context (near spawn + the original task)
 
 - Original user task (still open): **find a bank and open the bank box.** Nearest town with a
-  bank is **Jhelom at (1788,2090)** (Trammel). Exact town/dungeon/moongate coords are in
-  `.agents/skills/uo/knowledge/map/trammel.md` — use those, don't guess.
+  bank is **Britain (1475,1645,20)** (capital, biggest bank) or **New Haven (3506,2570,14)**
+  (new-player hub with a bank) — the earlier "Jhelom at (1788,2090)" note was WRONG; Jhelom
+  is at (1414,3816,0) per the server's location data. Exact town/dungeon/moongate coords are
+  in `.agents/skills/uo/knowledge/map/*.md` — use those, don't guess.
 - **Warriors' Guild** (the building Gemma was stuck in, ~ (1340-1360, 1724-1757)): a maze —
   floors at z=32/22/20 (mezzanine)/2; the z=20 mezzanine is a dead-end pocket; the exit is
   a step DOWN on the south side (~y=1758) into open ground (z≈17, sloping to 0). Multi-floor
@@ -180,7 +235,16 @@ skill first (that's what the user is watching), keep uoagent as a second consume
   ground reagents + trees (single-tile walls), a wall line at x≈1540 (gap to the north,
   y≈2002). The ESE mountain mass (target (1706,2010)) is confirmed impassable on foot —
   good permanent "unreachable goal" test target. Open ground to the north.
-- Near the old spawn (~1338,1997): a dead moongate at (1336,1997,5) (does nothing).
+- **Swamp/ridge country** (x≈1440-1500, y≈2070-2170, between the farmland and the old spawn):
+  hilly — z=0 valleys, z=5 ridges with cliffs, a z=-1 cave room (stairs at (1472,2151));
+  ground reagents everywhere (Nightshade, Ginseng, Blood Moss, Black Pearl); **live monster
+  spawns** (grey/timber wolves, grizzly bears, ettins, pigs, horses, sheep — aggressive when
+  approached). 25-tile travel hops fail here (detours exceed the loaded-chunk window); use
+  15-tile `pathfind` hops instead (item-04 notes, finding 2).
+- **Britain moongate (1336,1997,5)** — the Trammel public moongate (per
+  `knowledge/map/moongates.md`; gates to Jhelom/Moonglow/New Haven/etc.). The old "dead
+  moongate" note from a prior session is UNVERIFIED — retry properly: `./ai/uo use <serial>`
+  (or walk onto it) → `./ai/uo gumps` → `gump-respond` with the destination button.
 - The ground is littered with sellable reagents (Black Pearl, Sulfurous Ash, Spider Silk,
   Nightshade, Blood Moss, Mandrake) — the natural first gold loop: gather → sell in town →
   train Magery (vendors take to 40) → repeat. Long-term goal (in `ai/agent/profiles/gemma`):
@@ -196,8 +260,10 @@ skill first (that's what the user is watching), keep uoagent as a second consume
   - `Api/ActionQueue.cs` — `Enqueue` + `EnqueueAwait<T>`
   - `Api/TravelState.cs`, `Api/Models/TravelDto.cs`, `Api/Models/PlayerDto.cs` — travel + player fields
   - `Api/WorldSnapshot.cs` — `TileGrid` (radius consts 20/10, item-08 target), snapshot pattern
-- `src/ClassicUO.Client/Game/Pathfinder.cs` — `WalkTo` (now int), `PATHFINDER_MAX_NODES=10000`,
-  mobile-obstacle condition (~line 65/142), item-04 target.
+- `src/ClassicUO.Client/Game/Pathfinder.cs` — `WalkTo` (returns int),
+  `PATHFINDER_MAX_NODES=20000`, O(1) bookkeeping (`_openKeys`/`_openIndex`/`_closedKeys` +
+  `_freeOpen`/`_freeClosed` stacks, `MoveToClosedList`), `IgnoreMobileObstacles` static
+  toggle, mobile-obstacle condition (~line 73/150).
 - `src/ClassicUO.Client/Game/GameObjects/PlayerMobile.cs` — `Walk()` guard (~line 525);
   `Game/Managers/WalkerManager.cs` — `WalkingFailed`/`StepsCount`; `Game/Constants.cs:16`
   `MAX_STEP_COUNT=5`.
