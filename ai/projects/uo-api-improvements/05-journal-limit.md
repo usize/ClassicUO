@@ -35,6 +35,17 @@ last 20 — is the only reliable view today.)
 - `?limit=N` returns the N most recent entries, oldest→newest, `limit=0`/omitted returns all.
 - `since` behavior unchanged.
 
+## Test results (live, Trammel)
+
+All passed against a 100-entry buffer:
+
+- `say "journal limit test"` → `?limit=3` returned exactly the 3 newest lines, last one the
+  said text. `./ai/uo journal 3` (wrapper) identical.
+- `?limit=3` byte-identical to the tail of `?limit=0` (full buffer).
+- `?since=2026-08-25T00:00:00&limit=3` → newest 3 after the timestamp (since still filters
+  before the tail). `?since=<future>` → `[]`.
+- Bonus: buffer capacity observed at 100 entries.
+
 ## Commit
 
 `Fix journal limit to return the most recent entries`

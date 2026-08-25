@@ -20,7 +20,7 @@ namespace ClassicUO.RestApi.Controllers
 
             if (limit > 0)
             {
-                entries = entries.Take(limit);
+                entries = entries.TakeLast(limit);
             }
 
             return Ok(entries);

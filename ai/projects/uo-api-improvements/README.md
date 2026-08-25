@@ -11,7 +11,7 @@ one commit. Work them in order — later items build on earlier ones.
 - [x] 02 — pathfind returns pathFound/pathLength (introduces the awaited-action helper) (`3f7168f`)
 - [x] 03 — server-side chunked travel (`actions/travel`) with progress (`4c4bea7`)
 - [x] 04 — pathfinder: O(1) duplicate checks, higher node cap, mobile-obstacle toggle (`25973d`)
-- [ ] 05 — journal `limit` returns the most recent entries
+- [x] 05 — journal `limit` returns the most recent entries
 - [ ] 06 — action endpoints return JSON acks (move/use/attack/say)
 - [ ] 07 — rewrite `ai/uo goto` around travel + honest failure modes
 - [ ] 08 — configurable summary map radius (`?radius=`)
@@ -43,10 +43,16 @@ HTTP threads read (a static class, refreshed each tick).
 **Build & restart (required to test any C# change)**
 ```bash
 dotnet build src/ClassicUO.RestAPI/ClassicUO.RestAPI.csproj
-pkill -f "ClassicUO.RestAPI"                      # stops dotnet run + cuo-api
-# .NET shutdown takes a few seconds — wait for the old process to actually die,
-# otherwise two clients log in as the same character and race for port 9000:
-for i in $(seq 1 20); do pgrep -f "ClassicUO.RestAPI" >/dev/null || break; sleep 1; done
+pkill -TERM -f "ClassicUO.RestAPI"                # stops dotnet run + cuo-api
+# .NET graceful shutdown OFTEN hangs >40s ("Application is shutting down..." with the
+# game thread stuck) — wait, then KILL. Watch the binary path, NOT "ClassicUO.RestAPI":
+# a pgrep -f with that pattern matches the shell running this very script.
+for i in $(seq 1 40); do sleep 1
+  pgrep -f "bin/Debug/net10.0/cuo-api" >/dev/null || break; done
+pgrep -f "bin/Debug/net10.0/cuo-api" >/dev/null && pkill -9 -f "bin/Debug/net10.0/cuo-api"
+pgrep -f "dotnet run --project.*ClassicUO.RestAPI" >/dev/null && \
+  pkill -9 -f "dotnet run --project.*ClassicUO.RestAPI"
+sleep 2
 nohup ./run_rest_client.sh > /tmp/cuo-api.log 2>&1 &
 # wait for relogin (autologin is on; character reloads in place):
 for i in $(seq 1 45); do ./ai/uo status | grep -q '"inGame":true' && break; sleep 2; done
@@ -64,6 +70,10 @@ movement tests. If `inGame` never becomes true, check `/tmp/cuo-api.log`.
   (item 01 adds the tools to diagnose/clear it).
 
 **Git**
-- One commit per work item, message given in the item file.
+- One commit per work item. Subject line = the exact message given in the item file.
+  **Always add a commit body** (blank line after the subject) documenting: what changed,
+  the key design decisions/deviations from the spec, and the live test results (what was
+  verified and with what numbers). The subject keeps the per-item changelog scannable;
+  the body is the record for the next session.
 - Commit only files in the item's scope. Never commit `.restapi.toml`, `bin/`,
   `obj/`, or logs. `git status` must be clean (of your item's files) after commit.
