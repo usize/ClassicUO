@@ -211,10 +211,54 @@ namespace ClassicUO.RestApi.Controllers
             return PathfindAck(pathLength);
         }
 
+        /// <summary>Start server-side chunked travel to world coordinates (segmented A*, progress in player.travel).</summary>
+        [HttpPost("travel")]
+        public async Task<IActionResult> Travel([FromBody] TravelRequest request)
+        {
+            if (!request.X.HasValue || !request.Y.HasValue)
+            {
+                return BadRequest("provide 'x' and 'y'");
+            }
+
+            var goalX = request.X.Value;
+            var goalY = request.Y.Value;
+
+            var result = await EnqueueRun<TravelResultDto>(() =>
+            {
+                var world = GetWorld();
+                if (world?.Player == null) return null;
+
+                TravelState.GoalX = goalX;
+                TravelState.GoalY = goalY;
+                TravelState.GoalZ = (sbyte)(request.Z ?? world.Player.Z);
+                TravelState.GoalZExplicit = request.Z.HasValue;
+                TravelState.Active = true;
+                TravelState.LastPathfindTicks = 0;
+                TravelState.ConsecutiveFailures = 0;
+
+                return new TravelResultDto(
+                    true,
+                    goalX,
+                    goalY,
+                    Math.Max(Math.Abs(world.Player.X - goalX), Math.Abs(world.Player.Y - goalY)));
+            });
+
+            if (result == null)
+            {
+                return Ok(new { active = false, goalX, goalY, tilesRemaining = 0, error = "timeout" });
+            }
+
+            return Ok(new { result.Active, result.GoalX, result.GoalY, result.TilesRemaining });
+        }
+
         [HttpPost("stopwalk")]
         public IActionResult StopWalk()
         {
-            Enqueue(() => GetWorld()?.Player?.Pathfinder.StopAutoWalk());
+            Enqueue(() =>
+            {
+                TravelState.Active = false;
+                GetWorld()?.Player?.Pathfinder.StopAutoWalk();
+            });
             return Accepted();
         }
 

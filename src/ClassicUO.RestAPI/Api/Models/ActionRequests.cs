@@ -85,6 +85,16 @@ namespace ClassicUO.RestApi.Models
         public uint? Serial { get; set; }
     }
 
+    public class TravelRequest
+    {
+        /// <summary>Goal X coordinate (required).</summary>
+        public int? X { get; set; }
+        /// <summary>Goal Y coordinate (required).</summary>
+        public int? Y { get; set; }
+        /// <summary>Goal Z coordinate. Defaults to the player's current Z if omitted.</summary>
+        public int? Z { get; set; }
+    }
+
     public class PickUpRequest
     {
         /// <summary>Serial of the item to pick up (puts in cursor).</summary>

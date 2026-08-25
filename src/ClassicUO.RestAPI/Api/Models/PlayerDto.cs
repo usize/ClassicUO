@@ -28,6 +28,7 @@ namespace ClassicUO.RestApi.Models
             TargetingType = targetManager?.TargetingType.ToString() ?? "None";
             IsParalyzed = player.IsParalyzed;
             Walker = new WalkerDiagnosticsDto(player.Walker);
+            Travel = new TravelDto(player);
         }
 
         public uint Serial { get; }
@@ -48,6 +49,7 @@ namespace ClassicUO.RestApi.Models
         public string TargetingType { get; }
         public bool IsParalyzed { get; }
         public WalkerDiagnosticsDto Walker { get; }
+        public TravelDto Travel { get; }
 
         private static IReadOnlyList<ItemDto> BuildEquipment(PlayerMobile player)
         {

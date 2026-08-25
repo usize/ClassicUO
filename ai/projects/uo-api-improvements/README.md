@@ -7,8 +7,8 @@ one commit. Work them in order — later items build on earlier ones.
 
 ## Status
 
-- [ ] 01 — resync endpoint + walker diagnostics in player output
-- [ ] 02 — pathfind returns pathFound/pathLength (introduces the awaited-action helper)
+- [x] 01 — resync endpoint + walker diagnostics in player output (`bbc2f6e`)
+- [x] 02 — pathfind returns pathFound/pathLength (introduces the awaited-action helper) (`3f7168f`)
 - [ ] 03 — server-side chunked travel (`actions/travel`) with progress
 - [ ] 04 — pathfinder: O(1) duplicate checks, higher node cap, mobile-obstacle toggle
 - [ ] 05 — journal `limit` returns the most recent entries
@@ -44,6 +44,9 @@ HTTP threads read (a static class, refreshed each tick).
 ```bash
 dotnet build src/ClassicUO.RestAPI/ClassicUO.RestAPI.csproj
 pkill -f "ClassicUO.RestAPI"                      # stops dotnet run + cuo-api
+# .NET shutdown takes a few seconds — wait for the old process to actually die,
+# otherwise two clients log in as the same character and race for port 9000:
+for i in $(seq 1 20); do pgrep -f "ClassicUO.RestAPI" >/dev/null || break; sleep 1; done
 nohup ./run_rest_client.sh > /tmp/cuo-api.log 2>&1 &
 # wait for relogin (autologin is on; character reloads in place):
 for i in $(seq 1 45); do ./ai/uo status | grep -q '"inGame":true' && break; sleep 2; done

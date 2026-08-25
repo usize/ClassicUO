@@ -92,6 +92,38 @@ Add to help under MOVE.
   cleanly without a hot loop.
 - No changes to `Pathfinder.cs` (that's item 04).
 
+## Deviation (implemented)
+
+- **Segment size is 25, not 40.** `Pathfinder.CanWalk` reads tiles via
+  `Map.GetTile(x, y, load: false)` — A* can only search *already-loaded* 8×8 map
+  chunks (time-LRU, evicted by `Map.ClearUnusedBlocks`), so a 40-tile waypoint can
+  lie outside the loaded area and the search can never see it. Live testing (item 02)
+  found 25-tile hops work and 50-tile hops fail in cluttered terrain; 25 stays inside
+  both the loaded-chunk radius and the 10k node budget. Revisit after item 04
+  (pathfinder node cap / bookkeeping).
+- **Waypoint formula follows the spec's prose** ("waypoint N tiles along the straight
+  line to the goal", measured from the player). The spec's literal formula
+  `wx = gx + Clamp(playerX - gx, -N, N)` measures from the *goal*, which would make
+  the first segment ~110 tiles on a 150-tile trip — contradicting the spec's own
+  "small A*" premise. Implemented as `wx = playerX + Clamp(goalX - playerX, -N, N)`.
+- **Arrival requires the goal's floor when a Z was requested.** The spec's "x/y only"
+  arrival check let travel report "Arrived" while the character was still 20 Z units
+  above an explicit ground-floor goal (observed live: goal (1338,1740,2), "arrived" at
+  z=22 with no stair ever attempted). Implemented as
+  `Chebyshev(x,y) <= 1 && (!zExplicit || |playerZ - goalZ| <= 2)` — the floor check
+  applies only when the request included a Z (floors are ~20 Z apart, so 2 never spans
+  floors; ground terrain can slope ±3 between distant tiles, so an omitted Z must not
+  gate arrival). For off-floor explicit-Z goals the driver pathfinds the stair route in
+  the final segment (WalkTo handles z changes); if no stair is within segment reach it
+  retries on cooldown and the wrapper reports stuck/timeout honestly.
+- **Cooldown backs off on consecutive failures (1 s → 2 s → 4 s → 8 s → 15 s cap).**
+  The spec's flat 1 s retry loop measured 45–49% sustained CPU on the game thread when
+  stuck against the (1706,2010) mountain (up to 5 full A* searches per second), which
+  fails the spec's own "does not spin CPU" test. `TravelState.ConsecutiveFailures` grows
+  on each fully-failed cycle and resets on any successful pathfind (so a goal blocked by
+  a *moving* obstacle is still retried within ~1 s at first). A permanently blocked goal
+  settles to one 5-A* burst per 15 s ≈ a few % CPU.
+
 ## Commit
 
 `Add server-side chunked travel (actions/travel) with progress reporting`

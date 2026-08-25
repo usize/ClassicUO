@@ -210,6 +210,84 @@ case "$cmd" in
         done
         ;;
 
+    # travel <x> <y> [z] — server-side travel: walk there in segments, report progress
+    travel)
+        x="${1:?Usage: uo travel <x> <y> [z]}"
+        y="${2:?Usage: uo travel <x> <y> [z]}"
+        z="${3:-}"
+
+        if [[ ! "$x" =~ ^-?[0-9]+$ || ! "$y" =~ ^-?[0-9]+$ || ( -n "$z" && ! "$z" =~ ^-?[0-9]+$ ) ]]; then
+            echo "Error: travel coordinates must be integers" >&2
+            exit 1
+        fi
+
+        # Starting position + Chebyshev distance to the goal
+        cheb() { local d=$(( $1 > $2 ? $1 - $2 : $2 - $1 )); echo "$d"; }
+        player_json=$(_get "player")
+        px=$(echo "$player_json" | jq '.x')
+        py=$(echo "$player_json" | jq '.y')
+        pz=$(echo "$player_json" | jq '.z')
+        tiles=$(( $(cheb "$px" "$x") > $(cheb "$py" "$y") ? $(cheb "$px" "$x") : $(cheb "$py" "$y") ))
+
+        if [[ -n "$z" ]]; then
+            resp=$(_post "actions/travel" "{\"x\":$x,\"y\":$y,\"z\":$z}")
+        else
+            resp=$(_post "actions/travel" "{\"x\":$x,\"y\":$y}")
+        fi
+        echo "$resp"
+        echo "Traveling to ($x, $y${z:+, $z}) — about $tiles tiles, server chunks the route"
+
+        max_time=$(( tiles * 12 / 10 + 15 ))
+        (( max_time < 30 )) && max_time=30
+
+        start_time=$(date +%s)
+        last_pos="$px $py $pz"
+        stuck_count=0
+
+        while true; do
+            sleep 1
+
+            player_json=$(_get "player")
+            active=$(echo "$player_json" | jq '.travel.active // false')
+            cx=$(echo "$player_json" | jq '.x')
+            cy=$(echo "$player_json" | jq '.y')
+            cz=$(echo "$player_json" | jq '.z')
+            dist=$(( $(cheb "$cx" "$x") > $(cheb "$cy" "$y") ? $(cheb "$cx" "$x") : $(cheb "$cy" "$y") ))
+
+            if [[ "$active" == "false" ]]; then
+                if (( dist <= 1 )); then
+                    echo "✓ Arrived at ($cx, $cy, $cz)"
+                    exit 0
+                fi
+                # Active cleared without arrival (e.g. stopwalk from elsewhere)
+                echo "✗ Travel stopped at ($cx, $cy, $cz) — goal ($x, $y) is $dist tiles away"
+                echo "  try: ./ai/uo summary  (check for doors/monsters), ./ai/uo stopwalk"
+                exit 1
+            fi
+
+            # Stuck: position unchanged for 20 consecutive samples while active
+            pos="$cx $cy $cz"
+            if [[ "$pos" == "$last_pos" ]]; then
+                stuck_count=$((stuck_count + 1))
+            else
+                stuck_count=0
+                last_pos="$pos"
+            fi
+            if (( stuck_count >= 20 )); then
+                echo "✗ Travel stuck at ($cx, $cy, $cz) — goal ($x, $y) is $dist tiles away"
+                echo "  try: ./ai/uo summary  (check for doors/monsters), ./ai/uo stopwalk"
+                exit 1
+            fi
+
+            elapsed=$(( $(date +%s) - start_time ))
+            if (( elapsed >= max_time )); then
+                echo "✗ Travel stuck at ($cx, $cy, $cz) — goal ($x, $y) is $dist tiles away"
+                echo "  try: ./ai/uo summary  (check for doors/monsters), ./ai/uo stopwalk"
+                exit 1
+            fi
+        done
+        ;;
+
     # follow <serial> [--persistent] [interval] — pathfind to a mobile or item
     #   --persistent, -p: continuously follow (default interval: 1 second)
     follow)
@@ -659,6 +737,7 @@ MOVE
   uo move <dir> [run]           One step. dir: north south east west ne se sw nw
   uo walk <dir> <n> [run]       n steps with pacing (~0.4s between steps)
   uo goto <x> <y> [z]          Pathfind to world coordinates (A* around obstacles)
+  uo travel <x> <y> [z]        Server-side travel: walk there in segments, report progress
   uo follow <serial> [--persistent] [interval]
                                 Pathfind to mobile/item. Use -p for continuous follow
   uo stopwalk                   Cancel in-progress pathfinding
