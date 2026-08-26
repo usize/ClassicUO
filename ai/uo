@@ -45,6 +45,20 @@ case "$cmd" in
         _get "world/mobiles"
         ;;
 
+    screenshot|shot)
+        # PNG of the rendered isometric scene. Default path has a timestamp.
+        out="${1:-/tmp/uo-shot-$(date +%s).png}"
+        curl -s "$BASE/screenshot" -o "$out"
+        if head -c 4 "$out" | od -An -tx1 | grep -qi "89.*50.*4e.*47"; then
+            echo "$out"
+        else
+            echo "screenshot failed:" >&2
+            cat "$out" >&2; echo >&2
+            rm -f "$out"
+            exit 1
+        fi
+        ;;
+
     paperdoll)
         serial="$(_dec "${1:?Usage: uo paperdoll <serial>}")"
         _get "world/mobiles/$serial/paperdoll"
@@ -740,6 +754,7 @@ OBSERVE
   uo mobiles                    All visible mobiles (JSON)
   uo paperdoll <serial>         Equipment layers for a nearby mobile (JSON)
   uo status                     Connection state (JSON)
+  uo screenshot [path]          PNG of the rendered scene (default: /tmp/uo-shot-<ts>.png)
 
 MOVE
   uo move <dir> [run]           One step. dir: north south east west ne se sw nw
