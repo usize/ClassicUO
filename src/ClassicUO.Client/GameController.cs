@@ -66,6 +66,10 @@ namespace ClassicUO
         public Scene Scene { get; private set; }
         public AudioManager Audio { get; private set; }
         public UltimaOnline UO { get; } = new UltimaOnline();
+
+        // Frame render targets (world / lights / UI). Public so the REST API
+        // can read back the isometric scene for screenshots.
+        public RenderTargets RenderTargets => _renderTargets;
         public IPluginHost PluginHost { get; private set; }
         public GraphicsDeviceManager GraphicManager { get; }
 

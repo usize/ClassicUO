@@ -33,6 +33,14 @@ namespace ClassicUO.RestApi
         private const long TravelPathfindCooldownTicks = 1000;  // base: 1 s between pathfind attempts
         private const long TravelMaxCooldownTicks = 15000;      // backoff cap while failing
 
+        // After the frame is rendered, offer the world render target to any
+        // pending screenshot request (see ScreenshotCapture).
+        protected override void Draw(GameTime gameTime)
+        {
+            base.Draw(gameTime);
+            ScreenshotCapture.TryComplete(RenderTargets);
+        }
+
         protected override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
